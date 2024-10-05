@@ -23,6 +23,8 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@auth/core": "^0.35.3",
+		"@auth/sveltekit": "^1.5.3",
 		"@vercel/analytics": "^1.3.1"
 	}
 }

@@ -35,7 +35,9 @@
   };
 </script>
 
-<div class="mb-5 font-display">
+<div
+  class={`mb-5 font-display ${service.toLowerCase()} ${alt_service.toLowerCase()}`}
+>
   <b class="text-green">{date}</b>
   <h3 class="text-4xl mb-4">{title}</h3>
 
