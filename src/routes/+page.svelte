@@ -19,6 +19,17 @@
   Movies to Watch This October
 </h2>
 
+<p class="mb-7">
+  Here's where to stream (almost) all of the 31 for 31 Halloween Movies selected
+  by Ed and Henry from <a
+    href="https://open.spotify.com/episode/1P11eNk7cJzwRtJOk7KCaV?si=881b4ced12e24d92"
+    target="_blank"
+    class="text-green underline"
+  >
+    Last Podcast on the Left: Side Stories</a
+  >
+</p>
+
 {#each films as film}
   <Listing
     date={film.date}
