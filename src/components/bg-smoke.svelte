@@ -26,15 +26,15 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    /* background-image: linear-gradient(
+    background-image: linear-gradient(
       to top,
-      #376a2c,
-      #7aab7a,
-      #e5ede5,
-      #999999,
-      #999999,
-      #ffffff
-    ); */
+      rgba(55, 106, 44, 0.5),
+      rgba(122, 171, 122, 0.5),
+      rgba(229, 237, 229, 0.5),
+      rgba(153, 153, 153, 0.5),
+      rgba(153, 153, 153, 0.5),
+      rgba(255, 255, 255, 0)
+    );
     mix-blend-mode: color;
     pointer-events: none;
   }
