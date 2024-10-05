@@ -1,11 +1,10 @@
 <section>
-  <video
-    loop
-    src="https://video.wixstatic.com/video/d47472_58cce06729c54ccb935886c4b3647274/1080p/mp4/file.mp4"
-    autoplay
-    muted
-    playsinline
-  ></video>
+  <video loop autoplay muted playsinline>
+    <source
+      src="https://video.wixstatic.com/video/d47472_58cce06729c54ccb935886c4b3647274/1080p/mp4/file.mp4"
+      type="mp4"
+    />
+  </video>
 </section>
 
 <style>
@@ -28,13 +27,14 @@
     height: 100vh;
     background-image: linear-gradient(
       to top,
-      rgba(55, 106, 44, 0.5),
-      rgba(122, 171, 122, 0.5),
+      rgba(55, 106, 44, 0.6),
+      rgba(122, 171, 122, 0.6),
       rgba(229, 237, 229, 0.5),
-      rgba(153, 153, 153, 0.5),
-      rgba(153, 153, 153, 0.5),
+      rgba(153, 153, 153, 0.3),
+      rgba(153, 153, 153, 0.2),
       rgba(255, 255, 255, 0)
     );
+    background-color: rgba(255, 255, 255, 0);
     mix-blend-mode: color;
     pointer-events: none;
   }
