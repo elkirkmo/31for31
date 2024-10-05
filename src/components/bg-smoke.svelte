@@ -26,7 +26,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-image: linear-gradient(
+    /* background-image: linear-gradient(
       to top,
       #376a2c,
       #7aab7a,
@@ -34,7 +34,7 @@
       #999999,
       #999999,
       #ffffff
-    );
+    ); */
     mix-blend-mode: color;
     pointer-events: none;
   }
