@@ -3,7 +3,8 @@ export default {
   content: ['./src/**/*.{html,js,svelte,ts}'],
   theme: {
     colors: {
-      green: '#376a2c',
+      green: '#66cc33',
+      white: '#ffffff',
     },
     fontFamily: {
       display: ['Vollkorn', 'serif'],
