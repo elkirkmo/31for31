@@ -1,9 +1,11 @@
 <section>
-  <video loop autoplay muted playsinline>
-    <source
-      src="https://video.wixstatic.com/video/d47472_58cce06729c54ccb935886c4b3647274/1080p/mp4/file.mp4"
-      type="mp4"
-    />
+  <video
+    loop
+    autoplay
+    muted
+    playsinline
+    src="https://video.wixstatic.com/video/d47472_58cce06729c54ccb935886c4b3647274/1080p/mp4/file.mp4"
+  >
   </video>
 </section>
 
