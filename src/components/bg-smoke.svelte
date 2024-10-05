@@ -4,6 +4,7 @@
     src="https://video.wixstatic.com/video/d47472_58cce06729c54ccb935886c4b3647274/1080p/mp4/file.mp4"
     autoplay
     muted
+    playsinline
   ></video>
 </section>
 
