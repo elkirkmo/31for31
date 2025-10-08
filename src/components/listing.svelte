@@ -9,12 +9,12 @@
   export const forFree = (service) => {
     let forFree = false;
     switch (service.toLowerCase()) {
-      case 'tubi':
-      case 'plex':
-      case 'roku':
-      case 'plutotv':
-      case 'freevee':
-      case 'internet archive':
+      case "tubi":
+      case "plex":
+      case "roku":
+      case "plutotv":
+      case "freevee":
+      case "internet archive":
         forFree = true;
         break;
       default:
@@ -23,14 +23,14 @@
     }
 
     if (forFree) {
-      return 'for FREE';
+      return "for FREE";
     } else {
-      return '';
+      return "";
     }
   };
 
   const buttonText = (s) => {
-    if (s.toLowerCase() === 'fandango') return `Check Fandango For Showtimes`;
+    if (s.toLowerCase() === "fandango") return `Check Fandango For Showtimes`;
     return `Stream ${forFree(s)} on ${s}`;
   };
 </script>
