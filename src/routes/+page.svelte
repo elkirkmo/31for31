@@ -1,17 +1,19 @@
 <script>
-  import { dev } from '$app/environment';
-  import { inject } from '@vercel/analytics';
+  import { dev } from "$app/environment";
+  import { inject } from "@vercel/analytics";
 
-  inject({ mode: dev ? 'development' : 'production' });
-  import '../app.css';
+  inject({ mode: dev ? "development" : "production" });
+  import "../app.css";
 
   export let films;
-  import Listing from '../components/listing.svelte';
-  import BgSmoke from '../components/bg-smoke.svelte';
-  import Footer from '../components/footer.svelte';
-  import data from '../data.json';
+  import Listing from "../components/listing.svelte";
+  import BgSmoke from "../components/bg-smoke.svelte";
+  import Footer from "../components/footer.svelte";
+  import data from "../data.json";
 
-  films = data;
+  let year = new Date().getFullYear();
+
+  films = data["2025"];
 </script>
 
 <h1 class="lg:text-6xl mt-7 text-5xl font-display text-green">
