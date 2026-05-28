@@ -6,7 +6,7 @@
   export let link;
   export let alt_link;
 
-  export const forFree = (service) => {
+  const forFree = (service) => {
     let forFree = false;
     switch (service.toLowerCase()) {
       case "tubi":
@@ -42,12 +42,12 @@
   {#if service}<a target="_blank" href={link}>
       <button
         type="button"
-        class="btn bg-green hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-full mb-4"
+        class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full mb-4"
       >
         {buttonText(service)}
       </button></a
     >{/if}
-  {#if alt_service}<a target="_blank" href={alt_link}>
+  {#if alt_service}<a target="_blank" href={alt_link} rel="noopener noreferrer">
       <button
         type="button"
         class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full"
