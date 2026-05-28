@@ -12,32 +12,38 @@
   import data from "../data.json";
 
   films = data["2025"];
+  const { heading, subheading, headingPrefix, description, podcastLinkText, podcastLinkUrl } = data.textContent;
 </script>
 
 <svelte:head>
   <title>31 for 31 — Halloween Movies | Last Podcast on the Left</title>
-  <meta name="description" content="Where to stream the 31 for 31 Halloween Movies selected by Ed and Henry from Last Podcast on the Left." />
+  <meta
+    name="description"
+    content="Where to stream the 31 for 31 Halloween Movies selected by Ed and Henry from Last Podcast on the Left."
+  />
   <meta property="og:title" content="31 for 31 — Halloween Movies" />
-  <meta property="og:description" content="Where to stream Ed and Henry's 31 for 31 Halloween picks." />
+  <meta
+    property="og:description"
+    content="Where to stream Ed and Henry's 31 for 31 Halloween picks."
+  />
 </svelte:head>
 
 <h1 class="lg:text-6xl mt-7 text-5xl font-display text-green">
-  <span class="text-white text-3xl">Last Podcast on the Left presents: </span>31
-  for 31
+  <span class="text-white text-3xl">{headingPrefix}</span>{heading}
 </h1>
 <h2 class="lg:text-4xl text-2xl font-display mb-7 border-b-2 border-green">
-  Movies to Watch This October
+  {subheading}
 </h2>
 
 <p class="mb-7 mx-2">
-  Here's where to stream (almost) all of the 31 for 31 Halloween Movies selected
-  by Ed and Henry from <a
-    href="https://open.spotify.com/episode/1P11eNk7cJzwRtJOk7KCaV?si=881b4ced12e24d92"
+  {description}
+  <a
+    href={podcastLinkUrl}
     target="_blank"
     rel="noopener noreferrer"
     class="text-green underline"
   >
-    Last Podcast on the Left: Side Stories</a
+    {podcastLinkText}</a
   >
 </p>
 
