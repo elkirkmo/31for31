@@ -12,7 +12,14 @@
   import data from "../data.json";
 
   films = data["2025"];
-  const { heading, subheading, headingPrefix, description, podcastLinkText, podcastLinkUrl } = data.textContent;
+  const {
+    heading,
+    subheading,
+    headingPrefix,
+    description,
+    podcastLinkText,
+    podcastLinkUrl,
+  } = data.textContent;
 </script>
 
 <svelte:head>
