@@ -1,17 +1,19 @@
-<script>
+<script lang="ts">
   import { dev } from "$app/environment";
   import { inject } from "@vercel/analytics";
 
   inject({ mode: dev ? "development" : "production" });
   import "../app.css";
 
-  export let films;
   import Listing from "../components/listing.svelte";
   import BgSmoke from "../components/bg-smoke.svelte";
   import Footer from "../components/footer.svelte";
   import data from "../data.json";
 
-  films = data["2025"];
+  const years = Object.keys(data).filter((k) => k !== "textContent");
+  let selectedYear = "2025";
+  $: films = data[selectedYear as "2024" | "2025"];
+
   const {
     heading,
     subheading,
@@ -53,6 +55,21 @@
     {podcastLinkText}</a
   >
 </p>
+
+<h3>Past Years</h3>
+<ul id="pastYears" class="flex justify-center gap-4 list-none">
+  {#each years as year}
+    <li>
+      <button
+        type="button"
+        class="cursor-pointer font-display"
+        class:text-green={selectedYear === year}
+        on:click={() => (selectedYear = year)}
+        >{year}
+      </button>
+    </li>
+  {/each}
+</ul>
 
 {#each films as film}
   <Listing
