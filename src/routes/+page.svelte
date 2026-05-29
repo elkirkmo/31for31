@@ -65,7 +65,8 @@
         class="cursor-pointer font-display"
         class:text-green={selectedYear === year}
         on:click={() => (selectedYear = year)}
-      >{year}</button>
+        >{year}
+      </button>
     </li>
   {/each}
 </ul>
