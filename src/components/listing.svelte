@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   export let date;
   export let title;
   export let service;
@@ -6,7 +6,7 @@
   export let link;
   export let alt_link;
 
-  const forFree = (service) => {
+  const forFree = (service: string) => {
     let forFree = false;
     switch (service.toLowerCase()) {
       case "tubi":
@@ -29,7 +29,7 @@
     }
   };
 
-  const buttonText = (s) => {
+  const buttonText = (s: string) => {
     if (s.toLowerCase() === "fandango") return `Check Fandango For Showtimes`;
     return `Stream ${forFree(s)} on ${s}`;
   };
