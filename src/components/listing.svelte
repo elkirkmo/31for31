@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   export let date;
   export let title;
   export let service;
@@ -6,7 +6,7 @@
   export let link;
   export let alt_link;
 
-  const forFree = (service) => {
+  const forFree = (service: string) => {
     let forFree = false;
     switch (service.toLowerCase()) {
       case "tubi":
@@ -29,7 +29,7 @@
     }
   };
 
-  const buttonText = (s) => {
+  const buttonText = (s: string) => {
     if (s.toLowerCase() === "fandango") return `Check Fandango For Showtimes`;
     return `Stream ${forFree(s)} on ${s}`;
   };
@@ -39,7 +39,7 @@
   <b class="text-green">{date}</b>
   <h3 class="text-4xl mb-4">{title}</h3>
 
-  {#if service}<a target="_blank" href={link}>
+  {#if service}<a target="_blank" href={link} rel="noopener noreferrer">
       <button
         type="button"
         class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full mb-4"
