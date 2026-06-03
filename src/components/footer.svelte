@@ -1,21 +1,23 @@
+<script>
+  import data from '../data.json'
+  const { creditText, creditHandle, creditSuffix, disclaimer, disclaimerLinkText, githubUrl } = data.textContent.footer
+</script>
+
 <footer class="mb-7">
   <h5 class="mb-5">
-    Made with love by <a
-      href="https://github.com/elkirkmo/31for31"
+    {creditText} <a
+      href={githubUrl}
       target="_blank"
-      class="text-green">@elkirkmo</a
-    >. Hail yourself.
+      rel="noopener noreferrer"
+      class="text-green">{creditHandle}</a
+    >{creditSuffix}
   </h5>
   <i class="text-sm"
-    >This website is not owned, operated, or even acknowledged by LPN or any of
-    its affiliates. Links are valid only in the US region of various streaming
-    sites. This website does not aim to make money through affiliate links or
-    sign-up referrals or any such shenanigans and is only for informational
-    purposes. If you like what I did here and wanna help out or buy me a beer,
-    hit me up through <a
-      href="https://github.com/elkirkmo/31for31"
+    >{disclaimer} <a
+      href={githubUrl}
       target="_blank"
-      class="text-green">github</a
+      rel="noopener noreferrer"
+      class="text-green">{disclaimerLinkText}</a
     >.
   </i>
 </footer>
