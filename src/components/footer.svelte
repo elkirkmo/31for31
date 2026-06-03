@@ -3,7 +3,7 @@
   const { creditText, creditHandle, creditSuffix, disclaimer, disclaimerLinkText, githubUrl } = data.textContent.footer
 </script>
 
-<footer class="mb-7">
+<footer class="mt-auto mb-7">
   <h5 class="mb-5">
     {creditText} <a
       href={githubUrl}

@@ -3,11 +3,8 @@
   import { inject } from "@vercel/analytics";
 
   inject({ mode: dev ? "development" : "production" });
-  import "../app.css";
 
   import Listing from "../components/listing.svelte";
-  import BgSmoke from "../components/bg-smoke.svelte";
-  import Footer from "../components/footer.svelte";
   import data from "../data.json";
 
   const years = Object.keys(data).filter((k) => k !== "textContent");
@@ -81,5 +78,3 @@
     alt_link={film.alt_link}
   />
 {/each}
-<BgSmoke />
-<Footer />
