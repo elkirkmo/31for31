@@ -23,7 +23,7 @@ export const actions: Actions = {
 
     devLogin: async ({ locals: { supabase } }) => {
         const { error } = await supabase.auth.signInWithPassword({
-            email: 'dev@test.com',
+            email: 'dev@example.com',
             password: 'devpassword'
         })
 
