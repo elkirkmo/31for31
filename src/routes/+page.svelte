@@ -5,11 +5,14 @@
   inject({ mode: dev ? "development" : "production" });
 
   import Listing from "../components/listing.svelte";
-  import data from "../data.json";
+  import siteData from "../data.json";
 
-  const years = Object.keys(data).filter((k) => k !== "textContent");
+  export let data;
+
+  const years = Object.keys(siteData).filter((k) => k !== "textContent");
   let selectedYear = "2025";
-  $: films = data[selectedYear as "2024" | "2025"];
+  $: films = siteData[selectedYear as "2024" | "2025"];
+  $: watchedForYear = (data.watched?.[selectedYear] ?? []) as string[];
 
   const {
     heading,
@@ -18,7 +21,7 @@
     description,
     podcastLinkText,
     podcastLinkUrl,
-  } = data.textContent;
+  } = siteData.textContent;
 </script>
 
 <svelte:head>
@@ -61,6 +64,7 @@
         type="button"
         class="cursor-pointer font-display"
         class:text-green={selectedYear === year}
+        class:underline={selectedYear === year}
         on:click={() => (selectedYear = year)}
         >{year}
       </button>
@@ -76,5 +80,7 @@
     link={film.link}
     alt_service={film.alt_service}
     alt_link={film.alt_link}
+    year={selectedYear}
+    watched={data.session ? watchedForYear.includes(film.title) : undefined}
   />
 {/each}
