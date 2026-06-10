@@ -4,9 +4,12 @@ import { createServerClient } from '@supabase/ssr'
 import type { Handle } from '@sveltejs/kit'
 import ws from 'ws'
 
+if (!globalThis.WebSocket) {
+    globalThis.WebSocket = ws as unknown as typeof WebSocket
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
     event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
-        realtime: { transport: ws },
         cookies: {
             getAll() {
                 return event.cookies.getAll()
