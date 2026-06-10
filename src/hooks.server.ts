@@ -3,13 +3,16 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY } from '$env/stati
 import { createServerClient } from '@supabase/ssr'
 import type { Handle } from '@sveltejs/kit'
 import ws from 'ws'
+import type { Database } from './database.types'
 
+// Node.js < 22 has no native WebSocket; polyfill with the 'ws' package
 if (!globalThis.WebSocket) {
-    globalThis.WebSocket = ws as unknown as typeof WebSocket
+    // @ts-expect-error - ws satisfies the WebSocket interface at runtime
+    globalThis.WebSocket = ws
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
-    event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
+    event.locals.supabase = createServerClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
         cookies: {
             getAll() {
                 return event.cookies.getAll()
