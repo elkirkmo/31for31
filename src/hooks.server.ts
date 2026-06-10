@@ -5,14 +5,9 @@ import type { Handle } from '@sveltejs/kit'
 import ws from 'ws'
 import type { Database } from './database.types'
 
-// Node.js < 22 has no native WebSocket; polyfill with the 'ws' package
-if (!globalThis.WebSocket) {
-    // @ts-expect-error - ws satisfies the WebSocket interface at runtime
-    globalThis.WebSocket = ws
-}
-
 export const handle: Handle = async ({ event, resolve }) => {
     event.locals.supabase = createServerClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
+        realtime: { transport: ws as unknown as typeof WebSocket },
         cookies: {
             getAll() {
                 return event.cookies.getAll()
