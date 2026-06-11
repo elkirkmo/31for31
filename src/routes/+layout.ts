@@ -1,6 +1,7 @@
 import { PUBLIC_SUPABASE_PUBLISHABLE_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public'
 import type { LayoutLoad } from './$types'
 import { createBrowserClient, createServerClient, isBrowser } from '@supabase/ssr'
+import ws from 'ws'
 
 export const load: LayoutLoad = async ({ fetch, data, depends }) => {
     depends('supabase:auth')
@@ -12,6 +13,7 @@ export const load: LayoutLoad = async ({ fetch, data, depends }) => {
             },
         })
         : createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
+            realtime: { transport: ws as unknown as typeof WebSocket },
             global: {
                 fetch,
             },

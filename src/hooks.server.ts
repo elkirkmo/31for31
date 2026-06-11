@@ -3,13 +3,11 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY } from '$env/stati
 import { createServerClient } from '@supabase/ssr'
 import type { Handle } from '@sveltejs/kit'
 import ws from 'ws'
-
-if (!globalThis.WebSocket) {
-    globalThis.WebSocket = ws as unknown as typeof WebSocket
-}
+import type { Database } from './database.types'
 
 export const handle: Handle = async ({ event, resolve }) => {
-    event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
+    event.locals.supabase = createServerClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
+        realtime: { transport: ws as unknown as typeof WebSocket },
         cookies: {
             getAll() {
                 return event.cookies.getAll()
