@@ -18,6 +18,7 @@ export type Database = {
           user_id?: string
           watched?: Json
         }
+        Relationships: []
       }
     }
     Views: Record<string, never>
