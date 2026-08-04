@@ -3,10 +3,7 @@
 
   export let date: string;
   export let title: string;
-  export let service: string;
-  export let alt_service: string;
-  export let link: string;
-  export let alt_link: string;
+  export let service: { name: string; link: string }[];
   export let year: string = "";
   export let watched: boolean | undefined = undefined;
 
@@ -59,23 +56,17 @@
     </form>
   {/if}
 
-  {#if service}<a target="_blank" href={link} rel="noopener noreferrer">
+  {#each service as s}
+    <a target="_blank" href={s.link} rel="noopener noreferrer">
       <button
         type="button"
         class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full mb-4"
       >
-        {buttonText(service)}
+        {buttonText(s.name)}
       </button></a
-    >{/if}
-  {#if alt_service}<a target="_blank" href={alt_link} rel="noopener noreferrer">
-      <button
-        type="button"
-        class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full"
-      >
-        {buttonText(alt_service)}
-      </button></a
-    >{/if}
-  {#if !service && !alt_service}
+    >
+  {/each}
+  {#if service.length === 0}
     <h3>Streaming unavailable</h3>
   {/if}
 </div>
