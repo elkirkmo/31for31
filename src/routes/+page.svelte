@@ -77,9 +77,6 @@
     date={film.date}
     title={film.title}
     service={film.service}
-    link={film.link}
-    alt_service={film.alt_service}
-    alt_link={film.alt_link}
     year={selectedYear}
     watched={data.session ? watchedForYear.includes(film.title) : undefined}
   />
