@@ -13,6 +13,14 @@ npm run dev
 npm run dev -- --open
 ```
 
+## Development
+
+There's no local/mocked Supabase instance — `.env.local` points at the real hosted Supabase project, so data written while developing lands in the production database.
+
+To log in without going through the magic-link email flow, a **Dev login** button appears on the `/login` page whenever the app is running in dev mode (`npm run dev`). It signs in using the `DEV_LOGIN_EMAIL` / `DEV_LOGIN_PASSWORD` values in your `.env.local` (copy `.env.example` to get started) — that user must already exist in the Supabase project's Auth users table (create it via the Supabase dashboard if it's missing). Without those env vars set, the button shows a "Dev login is not configured" error instead of crashing.
+
+Because this hits the real database, toggling "watched" checkboxes while developing persists to the same `progress` table used in production, scoped to the dev user's row. Keep that in mind when testing — it's real, shared data, not a sandbox.
+
 ## Building
 
 To create a production version of your app:
