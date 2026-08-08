@@ -140,6 +140,40 @@ describe("streaming service buttons", () => {
     expect(screen.getByText("Streaming unavailable")).toBeInTheDocument();
   });
 
+  it("ignores duplicate Amazon Channel and Apple TV Channel add-ons", () => {
+    render(Listing, {
+      ...baseProps,
+      service: [
+        {
+          name: "Shudder Amazon Channel",
+          link: "https://amazon.com/shudder",
+          type: "subscription",
+          price: null,
+          currency: "USD",
+        },
+        {
+          name: "Starz Apple TV Channel",
+          link: "https://tv.apple.com/starz",
+          type: "subscription",
+          price: null,
+          currency: "USD",
+        },
+        {
+          name: "Shudder",
+          link: "https://shudder.com/1",
+          type: "subscription",
+          price: null,
+          currency: "USD",
+        },
+      ],
+    });
+
+    expect(
+      screen.getByRole("link", { name: "Stream with your Shudder subscription" }),
+    ).toBeInTheDocument();
+    expect(screen.queryAllByRole("link")).toHaveLength(1);
+  });
+
   it("renders one button per service, in order, when there are several", () => {
     render(Listing, {
       ...baseProps,
