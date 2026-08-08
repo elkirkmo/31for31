@@ -174,7 +174,7 @@ describe("streaming service buttons", () => {
     expect(screen.queryAllByRole("link")).toHaveLength(1);
   });
 
-  it("renders one button per service, in order, when there are several", () => {
+  it("renders one button per service when there are several", () => {
     render(Listing, {
       ...baseProps,
       service: [
@@ -202,5 +202,49 @@ describe("streaming service buttons", () => {
       screen.getByRole("link", { name: "Free on Roku" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Streaming unavailable")).not.toBeInTheDocument();
+  });
+
+  it("groups buttons by type in the order free, subscription, rent, buy", () => {
+    render(Listing, {
+      ...baseProps,
+      service: [
+        {
+          name: "Amazon Video",
+          link: "https://amazon.com/buy",
+          type: "buy",
+          price: 12.99,
+          currency: "USD",
+        },
+        {
+          name: "Amazon Video",
+          link: "https://amazon.com/rent",
+          type: "rent",
+          price: 3.99,
+          currency: "USD",
+        },
+        {
+          name: "Netflix",
+          link: "https://netflix.com/1",
+          type: "subscription",
+          price: null,
+          currency: "USD",
+        },
+        {
+          name: "Tubi",
+          link: "https://tubitv.com/1",
+          type: "free",
+          price: null,
+          currency: "USD",
+        },
+      ],
+    });
+
+    const links = screen.getAllByRole("link").map((link) => link.textContent?.trim());
+    expect(links).toEqual([
+      "Free on Tubi",
+      "Stream with your Netflix subscription",
+      "Rent on Amazon Video for $3.99",
+      "Buy on Amazon Video for $12.99",
+    ]);
   });
 });
