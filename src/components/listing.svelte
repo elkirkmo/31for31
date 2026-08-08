@@ -32,9 +32,12 @@
     price: number | null;
     currency?: string | null;
   }) => {
+    const uppercaseType = type.charAt(0).toUpperCase() + type.slice(1);
+
     if (type === "subscription") return `Stream with your ${name} ${type}`;
-    const priceText = price !== null ? ` for ${formatPrice(price, currency)}` : "";
-    return `${type} on ${name}${priceText}`;
+    const priceText =
+      price !== null ? ` for ${formatPrice(price, currency)}` : "";
+    return `${uppercaseType} on ${name}${priceText}`;
   };
 </script>
 

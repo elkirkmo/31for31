@@ -76,7 +76,7 @@ describe("streaming service buttons", () => {
       ],
     });
 
-    const link = screen.getByRole("link", { name: "free on Tubi" });
+    const link = screen.getByRole("link", { name: "Free on Tubi" });
     expect(link).toHaveAttribute("href", "https://tubitv.com/movies/1");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -118,7 +118,7 @@ describe("streaming service buttons", () => {
     });
 
     expect(
-      screen.getByRole("link", { name: "rent on Amazon Video for $3.99" }),
+      screen.getByRole("link", { name: "Rent on Amazon Video for $3.99" }),
     ).toBeInTheDocument();
   });
 
@@ -165,7 +165,7 @@ describe("streaming service buttons", () => {
       screen.getByRole("link", { name: "Stream with your Prime subscription" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "free on Roku" }),
+      screen.getByRole("link", { name: "Free on Roku" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Streaming unavailable")).not.toBeInTheDocument();
   });
