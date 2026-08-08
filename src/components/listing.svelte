@@ -9,6 +9,7 @@
     type: string;
     price: number | null;
     currency?: string | null;
+    icon?: string | null;
   }[];
   export let year: string = "";
   export let watched: boolean | undefined = undefined;
@@ -55,34 +56,54 @@
       price !== null ? ` for ${formatPrice(price, currency)}` : "";
     return `${uppercaseType} on ${name}${priceText}`;
   };
+
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 </script>
 
 <div class="mb-5 font-display">
   <b class="text-green">{date}</b>
-  <h3 class="text-4xl mb-4">{title}</h3>
+  <div class="flex items-center justify-center mb-4">
+    <h3 class="text-4xl">{title}</h3>
 
-  {#if watched !== undefined}
-    <form method="POST" action="?/toggleWatched" use:enhance class="mb-4">
-      <input type="hidden" name="title" value={title} />
-      <input type="hidden" name="year" value={year} />
-      <label class="watch-checkbox">
-        <input
-          type="checkbox"
-          checked={watched}
-          on:change={(e) => e.currentTarget.form?.requestSubmit()}
-        />
-        <span class="watch-checkmark" />
-        <span class="text-sm" class:text-green={watched}>Watched</span>
-      </label>
-    </form>
-  {/if}
+    {#if watched !== undefined}
+      <form
+        method="POST"
+        action="?/toggleWatched"
+        use:enhance
+        class="pl-[30px]"
+      >
+        <input type="hidden" name="title" value={title} />
+        <input type="hidden" name="year" value={year} />
+        <label class="watch-checkbox">
+          <input
+            type="checkbox"
+            checked={watched}
+            on:change={(e) => e.currentTarget.form?.requestSubmit()}
+          />
+          <span class="watch-checkmark" />
+          <span class="text-sm" class:text-green={watched}>Watched</span>
+        </label>
+      </form>
+    {/if}
+  </div>
 
-  {#each availableServices as s}
+  {#each availableServices as s, i}
+    {#if i > 0 && s.type !== availableServices[i - 1].type}
+      <hr class="w-full border-t-2 border-white mb-5" />
+    {/if}
+    {#if i === 0 || s.type !== availableServices[i - 1].type}
+      <h3 class="text-xl mb-2">{capitalize(s.type)}</h3>
+    {/if}
     <a target="_blank" href={s.link} rel="noopener noreferrer">
       <button
         type="button"
-        class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full mb-4"
+        class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full mb-4 mr-[1pc] inline-flex items-center gap-2"
       >
+        <img
+          src={s.icon}
+          alt="{s.name} icon"
+          class="w-8 h-8 rounded-full object-cover"
+        />
         {buttonText(s)}
       </button></a
     >
@@ -120,6 +141,41 @@
     background-color: #1a1a1a;
     border-radius: 50%;
     transition: 0.4s;
+    --glow-color: 255, 255, 255;
+  }
+
+  .watch-checkmark::before {
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(var(--glow-color), 0.55) 0%,
+      rgba(var(--glow-color), 0.25) 45%,
+      rgba(var(--glow-color), 0) 75%
+    );
+    z-index: -1;
+    pointer-events: none;
+    animation: spooky-glow 2.4s ease-in-out infinite;
+  }
+
+  @keyframes spooky-glow {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(0.9);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.2);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .watch-checkmark::before {
+      animation: none;
+    }
   }
 
   .watch-checkmark:hover {
@@ -132,10 +188,15 @@
     box-shadow: none;
     background-color: #66cc33;
     transform: rotateX(360deg);
+    --glow-color: 102, 204, 51;
   }
 
   .watch-checkbox input:checked ~ .watch-checkmark:hover {
     box-shadow: 0 0 10px rgba(102, 204, 51, 0.6);
+  }
+
+  .watch-checkbox input:not(:checked) ~ .watch-checkmark {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
   }
 
   .watch-checkmark:after {

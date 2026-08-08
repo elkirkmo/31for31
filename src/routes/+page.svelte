@@ -57,7 +57,7 @@
 </p>
 
 <h3>Past Years</h3>
-<ul id="pastYears" class="flex justify-center gap-4 list-none">
+<ul id="pastYears" class="flex justify-center gap-4 list-none mb-[30px]">
   {#each years as year}
     <li>
       <button
