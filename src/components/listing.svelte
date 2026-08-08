@@ -13,12 +13,23 @@
   export let year: string = "";
   export let watched: boolean | undefined = undefined;
 
-  $: availableServices = service.filter(
-    (s) =>
-      s.type !== "cinema" &&
-      !s.name.includes("Amazon Channel") &&
-      !s.name.includes("Apple TV Channel"),
-  );
+  const typeOrder = ["free", "subscription", "rent", "buy"];
+
+  $: availableServices = service
+    .filter(
+      (s) =>
+        s.type !== "cinema" &&
+        !s.name.includes("Amazon Channel") &&
+        !s.name.includes("Apple TV Channel"),
+    )
+    .sort((a, b) => {
+      const aIndex = typeOrder.indexOf(a.type);
+      const bIndex = typeOrder.indexOf(b.type);
+      return (
+        (aIndex === -1 ? typeOrder.length : aIndex) -
+        (bIndex === -1 ? typeOrder.length : bIndex)
+      );
+    });
 
   const formatPrice = (price: number, currency?: string | null) =>
     new Intl.NumberFormat("en-US", {
