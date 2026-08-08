@@ -76,7 +76,7 @@ describe("streaming service buttons", () => {
       ],
     });
 
-    const link = screen.getByRole("link", { name: "Free on Tubi" });
+    const link = screen.getByRole("link", { name: "Tubi icon Free on Tubi" });
     expect(link).toHaveAttribute("href", "https://tubitv.com/movies/1");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -98,7 +98,7 @@ describe("streaming service buttons", () => {
 
     expect(
       screen.getByRole("link", {
-        name: "Stream with your Netflix subscription",
+        name: "Netflix icon Stream with your Netflix subscription",
       }),
     ).toBeInTheDocument();
   });
@@ -118,7 +118,9 @@ describe("streaming service buttons", () => {
     });
 
     expect(
-      screen.getByRole("link", { name: "Rent on Amazon Video for $3.99" }),
+      screen.getByRole("link", {
+        name: "Amazon Video icon Rent on Amazon Video for $3.99",
+      }),
     ).toBeInTheDocument();
   });
 
@@ -169,7 +171,9 @@ describe("streaming service buttons", () => {
     });
 
     expect(
-      screen.getByRole("link", { name: "Stream with your Shudder subscription" }),
+      screen.getByRole("link", {
+        name: "Shudder icon Stream with your Shudder subscription",
+      }),
     ).toBeInTheDocument();
     expect(screen.queryAllByRole("link")).toHaveLength(1);
   });
@@ -196,10 +200,12 @@ describe("streaming service buttons", () => {
     });
 
     expect(
-      screen.getByRole("link", { name: "Stream with your Prime subscription" }),
+      screen.getByRole("link", {
+        name: "Prime icon Stream with your Prime subscription",
+      }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Free on Roku" }),
+      screen.getByRole("link", { name: "Roku icon Free on Roku" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Streaming unavailable")).not.toBeInTheDocument();
   });
@@ -214,6 +220,7 @@ describe("streaming service buttons", () => {
           type: "buy",
           price: 12.99,
           currency: "USD",
+          icon: "https://images.justwatch.com/icon/amazon.webp",
         },
         {
           name: "Amazon Video",
@@ -221,6 +228,7 @@ describe("streaming service buttons", () => {
           type: "rent",
           price: 3.99,
           currency: "USD",
+          icon: "https://images.justwatch.com/icon/amazon.webp",
         },
         {
           name: "Netflix",
@@ -228,6 +236,7 @@ describe("streaming service buttons", () => {
           type: "subscription",
           price: null,
           currency: "USD",
+          icon: "https://images.justwatch.com/icon/netflix.webp",
         },
         {
           name: "Tubi",
@@ -235,16 +244,41 @@ describe("streaming service buttons", () => {
           type: "free",
           price: null,
           currency: "USD",
+          icon: "https://images.justwatch.com/icon/tubi.webp",
         },
       ],
     });
 
-    const links = screen.getAllByRole("link").map((link) => link.textContent?.trim());
+    const links = screen
+      .getAllByRole("link")
+      .map((link) => link.textContent?.replace(/\s+/g, " ").trim());
     expect(links).toEqual([
       "Free on Tubi",
       "Stream with your Netflix subscription",
       "Rent on Amazon Video for $3.99",
       "Buy on Amazon Video for $12.99",
+    ]);
+    expect(document.querySelectorAll("hr")).toHaveLength(3);
+
+    const icons = screen
+      .getAllByRole("img")
+      .map((img) => [img.getAttribute("src"), img.getAttribute("alt")]);
+    expect(icons).toEqual([
+      ["https://images.justwatch.com/icon/tubi.webp", "Tubi icon"],
+      ["https://images.justwatch.com/icon/netflix.webp", "Netflix icon"],
+      ["https://images.justwatch.com/icon/amazon.webp", "Amazon Video icon"],
+      ["https://images.justwatch.com/icon/amazon.webp", "Amazon Video icon"],
+    ]);
+
+    const headings = screen
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+    expect(headings).toEqual([
+      baseProps.title,
+      "Free",
+      "Subscription",
+      "Rent",
+      "Buy",
     ]);
   });
 });
