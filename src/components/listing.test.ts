@@ -62,56 +62,110 @@ describe("streaming service buttons", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("labels free services as 'for FREE' and links to their URL", () => {
+  it("labels free services without a price and links to their URL", () => {
     render(Listing, {
       ...baseProps,
-      service: [{ name: "Tubi", link: "https://tubitv.com/movies/1" }],
+      service: [
+        {
+          name: "Tubi",
+          link: "https://tubitv.com/movies/1",
+          type: "free",
+          price: null,
+          currency: "USD",
+        },
+      ],
     });
 
-    const link = screen.getByRole("link", {
-      name: "Stream for FREE on Tubi",
-    });
+    const link = screen.getByRole("link", { name: "free on Tubi" });
     expect(link).toHaveAttribute("href", "https://tubitv.com/movies/1");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("does not add 'for FREE' for paid services", () => {
+  it("labels subscription services as 'Stream with your ... subscription'", () => {
     render(Listing, {
       ...baseProps,
-      service: [{ name: "Netflix", link: "https://netflix.com/watch/1" }],
+      service: [
+        {
+          name: "Netflix",
+          link: "https://netflix.com/watch/1",
+          type: "subscription",
+          price: null,
+          currency: "USD",
+        },
+      ],
     });
 
     expect(
-      screen.getByRole("link", { name: "Stream on Netflix" }),
+      screen.getByRole("link", {
+        name: "Stream with your Netflix subscription",
+      }),
     ).toBeInTheDocument();
   });
 
-  it("shows a showtimes prompt instead of 'stream on' for Fandango", () => {
+  it("labels rent/buy services with type, name, and formatted price", () => {
     render(Listing, {
       ...baseProps,
-      service: [{ name: "Fandango", link: "https://fandango.com/x" }],
+      service: [
+        {
+          name: "Amazon Video",
+          link: "https://amazon.com/1",
+          type: "rent",
+          price: 3.99,
+          currency: "USD",
+        },
+      ],
     });
 
     expect(
-      screen.getByRole("link", { name: "Check Fandango For Showtimes" }),
+      screen.getByRole("link", { name: "rent on Amazon Video for $3.99" }),
     ).toBeInTheDocument();
+  });
+
+  it("ignores cinema-type services", () => {
+    render(Listing, {
+      ...baseProps,
+      service: [
+        {
+          name: "Fandango",
+          link: "https://fandango.com/x",
+          type: "cinema",
+          price: null,
+          currency: "USD",
+        },
+      ],
+    });
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("Streaming unavailable")).toBeInTheDocument();
   });
 
   it("renders one button per service, in order, when there are several", () => {
     render(Listing, {
       ...baseProps,
       service: [
-        { name: "Prime", link: "https://amazon.com/1" },
-        { name: "Roku", link: "https://roku.com/1" },
+        {
+          name: "Prime",
+          link: "https://amazon.com/1",
+          type: "subscription",
+          price: null,
+          currency: "USD",
+        },
+        {
+          name: "Roku",
+          link: "https://roku.com/1",
+          type: "free",
+          price: null,
+          currency: "USD",
+        },
       ],
     });
 
     expect(
-      screen.getByRole("link", { name: "Stream on Prime" }),
+      screen.getByRole("link", { name: "Stream with your Prime subscription" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Stream for FREE on Roku" }),
+      screen.getByRole("link", { name: "free on Roku" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Streaming unavailable")).not.toBeInTheDocument();
   });

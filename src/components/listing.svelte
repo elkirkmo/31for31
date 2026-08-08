@@ -3,36 +3,38 @@
 
   export let date: string;
   export let title: string;
-  export let service: { name: string; link: string }[];
+  export let service: {
+    name: string;
+    link: string | null;
+    type: string;
+    price: number | null;
+    currency?: string | null;
+  }[];
   export let year: string = "";
   export let watched: boolean | undefined = undefined;
 
-  const forFree = (service: string) => {
-    let forFree = false;
-    switch (service.toLowerCase()) {
-      case "tubi":
-      case "plex":
-      case "roku":
-      case "plutotv":
-      case "freevee":
-      case "internet archive":
-        forFree = true;
-        break;
-      default:
-        forFree = false;
-        break;
-    }
+  $: availableServices = service.filter((s) => s.type !== "cinema");
 
-    if (forFree) {
-      return "for FREE";
-    } else {
-      return "";
-    }
-  };
+  const formatPrice = (price: number, currency?: string | null) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency ?? "USD",
+    }).format(price);
 
-  const buttonText = (s: string) => {
-    if (s.toLowerCase() === "fandango") return `Check Fandango For Showtimes`;
-    return `Stream ${forFree(s)} on ${s}`;
+  const buttonText = ({
+    name,
+    type,
+    price,
+    currency,
+  }: {
+    name: string;
+    type: string;
+    price: number | null;
+    currency?: string | null;
+  }) => {
+    if (type === "subscription") return `Stream with your ${name} ${type}`;
+    const priceText = price !== null ? ` for ${formatPrice(price, currency)}` : "";
+    return `${type} on ${name}${priceText}`;
   };
 </script>
 
@@ -56,17 +58,17 @@
     </form>
   {/if}
 
-  {#each service as s}
+  {#each availableServices as s}
     <a target="_blank" href={s.link} rel="noopener noreferrer">
       <button
         type="button"
         class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full mb-4"
       >
-        {buttonText(s.name)}
+        {buttonText(s)}
       </button></a
     >
   {/each}
-  {#if service.length === 0}
+  {#if availableServices.length === 0}
     <h3>Streaming unavailable</h3>
   {/if}
 </div>
