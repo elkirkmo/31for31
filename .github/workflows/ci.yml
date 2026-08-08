@@ -17,4 +17,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run check
+        env:
+          PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+          PUBLIC_SUPABASE_PUBLISHABLE_KEY: "placeholder"
       - run: npm test
