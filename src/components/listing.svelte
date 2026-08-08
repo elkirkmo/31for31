@@ -13,7 +13,12 @@
   export let year: string = "";
   export let watched: boolean | undefined = undefined;
 
-  $: availableServices = service.filter((s) => s.type !== "cinema");
+  $: availableServices = service.filter(
+    (s) =>
+      s.type !== "cinema" &&
+      !s.name.includes("Amazon Channel") &&
+      !s.name.includes("Apple TV Channel"),
+  );
 
   const formatPrice = (price: number, currency?: string | null) =>
     new Intl.NumberFormat("en-US", {
