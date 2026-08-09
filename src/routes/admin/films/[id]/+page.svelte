@@ -40,9 +40,27 @@
   </p>
 {:else if form?.success}
   <p class="text-green mt-4">Saved via the scraper.</p>
+{:else if form?.rescraped}
+  <p class="text-green mt-4">Offers updated from a fresh scrape.</p>
 {/if}
 
-<h3 class="text-xl mt-8 mb-2">Current offers (from our database)</h3>
+<h3 class="text-xl mt-8 mb-2">Offers</h3>
+
+<form method="POST" action="?/rescrape" use:enhance class="mb-4">
+  <button type="submit" class="text-sm text-green underline">Rescrape this film</button>
+</form>
+
+{#if form?.rescrapePreview}
+  <p class="text-sm mb-4">
+    +{form.rescrapePreview.added} -{form.rescrapePreview.removed} ~{form.rescrapePreview.changed}
+    ({form.rescrapePreview.unchanged} unchanged)
+  </p>
+  <form method="POST" action="?/applyRescrape" use:enhance class="mb-6">
+    <button type="submit" class="text-sm text-green underline">Apply</button>
+  </form>
+{/if}
+
+<h4 class="text-lg mb-2">Current offers (from our database)</h4>
 {#if data.film.services.length === 0}
   <p class="text-sm opacity-70">No offers stored yet.</p>
 {:else}

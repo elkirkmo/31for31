@@ -1,7 +1,9 @@
 import { error } from '@sveltejs/kit'
 import { requireAdmin } from '$lib/server/requireAdmin'
 import { supabaseAdmin } from '$lib/server/supabaseAdmin'
-import { replaceYear } from '$lib/server/scraperClient'
+import { replaceYear, scrapeOne, type ScraperOffer } from '$lib/server/scraperClient'
+import { applyFilmOffers } from '$lib/server/applyOffers'
+import { diffServices } from '$lib/server/diffOffers'
 import type { Actions } from './$types'
 
 type YearFilm = { id: number; date: string; title: string; justwatch_url: string | null }
@@ -73,5 +75,56 @@ export const actions: Actions = {
         if (!result.ok) return { error: result.error }
 
         return { success: true, deleted: true }
+    },
+
+    // Preview-only: scrapes this film ad hoc (independent of the scraper's
+    // own film list, so this also works for a film that only exists in our
+    // table) and diffs it against what's currently stored. Doesn't write.
+    rescrape: async ({ params, locals }) => {
+        await requireAdmin(locals)
+
+        const filmId = Number(params.id)
+        const { data: film } = await supabaseAdmin
+            .from('films')
+            .select('title, justwatch_url, services(*)')
+            .eq('id', filmId)
+            .single()
+        if (!film) return { error: 'Film not found.' }
+
+        const result = await scrapeOne(film.title, film.justwatch_url ?? undefined)
+        if (!result.ok) return { error: result.error }
+        if (result.data.error) return { error: result.data.error }
+
+        const diff = diffServices(film.services as ScraperOffer[], result.data.service)
+        return {
+            rescrapePreview: {
+                added: diff.added.length,
+                removed: diff.removed.length,
+                changed: diff.changed.length,
+                unchanged: diff.unchanged.length
+            }
+        }
+    },
+
+    // Re-scrapes fresh (doesn't trust the preview payload) and applies it.
+    applyRescrape: async ({ params, locals }) => {
+        await requireAdmin(locals)
+
+        const filmId = Number(params.id)
+        const { data: film } = await supabaseAdmin
+            .from('films')
+            .select('title, justwatch_url')
+            .eq('id', filmId)
+            .single()
+        if (!film) return { error: 'Film not found.' }
+
+        const result = await scrapeOne(film.title, film.justwatch_url ?? undefined)
+        if (!result.ok) return { error: result.error }
+        if (result.data.error) return { error: result.data.error }
+
+        const applyResult = await applyFilmOffers(filmId, result.data.service)
+        if (!applyResult.ok) return { error: applyResult.error }
+
+        return { rescraped: true }
     }
 }
