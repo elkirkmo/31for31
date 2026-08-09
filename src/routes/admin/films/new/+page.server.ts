@@ -15,6 +15,9 @@ export const actions: Actions = {
         if (!year || !title) {
             return { error: 'Year and title are required.' }
         }
+        if (!/^\d{4}$/.test(year)) {
+            return { error: 'Year must be a 4-digit number.' }
+        }
 
         const result = await addFilm(year, { title, date, justwatch_url })
         if (!result.ok) {

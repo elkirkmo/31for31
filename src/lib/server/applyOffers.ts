@@ -4,6 +4,21 @@ import type { ServiceType } from '../../database.types'
 
 export type ApplyResult = { ok: true } | { ok: false; error: string }
 
+// service.link is rendered as a public <a href> and service.icon as an
+// <img src> for every site visitor (see listing.svelte) -- both come from
+// the scraper, so reject anything that isn't a plain http(s) URL rather
+// than trusting it verbatim (e.g. a javascript: URI would be clickable-XSS
+// on the homepage).
+function sanitizeUrl(value: string | null): string | null {
+    if (!value) return null
+    try {
+        const url = new URL(value)
+        return url.protocol === 'http:' || url.protocol === 'https:' ? value : null
+    } catch {
+        return null
+    }
+}
+
 // Replaces a film's stored offers wholesale with a freshly scraped list.
 // Shared by the batch refresh flow (/admin/refresh) and the per-film
 // "Rescrape this film" action on /admin/films/[id].
@@ -19,8 +34,8 @@ export async function applyFilmOffers(filmId: number, offers: ScraperOffer[]): P
         type: o.type as ServiceType,
         price: o.price,
         currency: o.currency,
-        link: o.link,
-        icon: o.icon
+        link: sanitizeUrl(o.link),
+        icon: sanitizeUrl(o.icon)
     }))
 
     const { error: insertError } = await supabaseAdmin.from('services').insert(rows)

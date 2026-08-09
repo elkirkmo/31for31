@@ -36,6 +36,30 @@ describe('admin new film action', () => {
         expect(addFilmMock).not.toHaveBeenCalled()
     })
 
+    it('returns an error and skips the scraper when year is not a 4-digit number', async () => {
+        const event = {
+            request: formDataRequest({ year: '25', title: 'Whatever' }),
+            locals: {}
+        } as unknown as Parameters<typeof actions.default>[0]
+
+        const result = await actions.default(event)
+
+        expect(result).toEqual({ error: 'Year must be a 4-digit number.' })
+        expect(addFilmMock).not.toHaveBeenCalled()
+    })
+
+    it('rejects a year with a non-numeric or path-like value', async () => {
+        const event = {
+            request: formDataRequest({ year: '2026/../etc', title: 'Whatever' }),
+            locals: {}
+        } as unknown as Parameters<typeof actions.default>[0]
+
+        const result = await actions.default(event)
+
+        expect(result).toEqual({ error: 'Year must be a 4-digit number.' })
+        expect(addFilmMock).not.toHaveBeenCalled()
+    })
+
     it('calls addFilm with trimmed fields and returns the created film on success', async () => {
         addFilmMock.mockResolvedValue({ ok: true, data: { id: 202601, title: 'Some Movie' } })
         const event = {

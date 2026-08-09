@@ -73,4 +73,44 @@ describe('applyFilmOffers', () => {
 
         expect(result).toEqual({ ok: false, error: 'insert failed' })
     })
+
+    it('keeps http(s) links and icons as-is', async () => {
+        const insert = vi.fn(async () => ({ error: null }))
+        fromMock.mockReturnValue({
+            delete: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
+            insert
+        })
+
+        await applyFilmOffers(1, [
+            { ...offer('Tubi'), link: 'https://tubi.tv/1', icon: 'http://images.justwatch.com/tubi.webp' }
+        ])
+
+        expect(insert).toHaveBeenCalledWith([
+            expect.objectContaining({ link: 'https://tubi.tv/1', icon: 'http://images.justwatch.com/tubi.webp' })
+        ])
+    })
+
+    it('strips a javascript: URI instead of storing it', async () => {
+        const insert = vi.fn(async () => ({ error: null }))
+        fromMock.mockReturnValue({
+            delete: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
+            insert
+        })
+
+        await applyFilmOffers(1, [{ ...offer('Tubi'), link: 'javascript:alert(document.cookie)', icon: null }])
+
+        expect(insert).toHaveBeenCalledWith([expect.objectContaining({ link: null })])
+    })
+
+    it('strips a malformed URL instead of storing it', async () => {
+        const insert = vi.fn(async () => ({ error: null }))
+        fromMock.mockReturnValue({
+            delete: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
+            insert
+        })
+
+        await applyFilmOffers(1, [{ ...offer('Tubi'), link: 'not a url', icon: null }])
+
+        expect(insert).toHaveBeenCalledWith([expect.objectContaining({ link: null })])
+    })
 })
