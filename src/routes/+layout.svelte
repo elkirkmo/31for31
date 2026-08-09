@@ -1,4 +1,5 @@
 <script>
+  import { dev } from "$app/environment";
   import BgSmoke from "../components/bg-smoke.svelte";
   import Footer from "../components/footer.svelte";
   import { enhance } from "$app/forms";
@@ -15,15 +16,23 @@
     {:else}
       <span></span>
     {/if}
-    {#if data.session}
-      <form method="POST" action="/logout" use:enhance>
-        <button type="submit" class="text-sm text-green underline"
-          >Log out</button
-        >
-      </form>
-    {:else}
-      <a href="/login" class="text-sm text-green underline">Log in</a>
-    {/if}
+    <div class="flex items-center gap-4">
+      {#if data.isAdmin}
+        <a href="/admin" class="text-sm text-green underline">Admin</a>
+      {/if}
+      {#if dev}
+        <a href="/admin" class="text-sm text-green underline">Admin (dev)</a>
+      {/if}
+      {#if data.session}
+        <form method="POST" action="/logout" use:enhance>
+          <button type="submit" class="text-sm text-green underline"
+            >Log out</button
+          >
+        </form>
+      {:else}
+        <a href="/login" class="text-sm text-green underline">Log in</a>
+      {/if}
+    </div>
   </header>
   <main class="flex-1">
     <slot />

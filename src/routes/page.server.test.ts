@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { actions } from "./+page.server";
+import { actions, load } from "./+page.server";
 import type { WatchedFilms } from "../database.types";
 
 function formDataRequest(fields: Record<string, string>) {
@@ -126,5 +126,124 @@ describe("toggleWatched action", () => {
     const result = await actions.toggleWatched(event);
 
     expect(result).toEqual({ error: "connection refused" });
+  });
+});
+
+function fakeSupabaseForLoad({
+  filmRows = [] as Record<string, unknown>[],
+  watched = null as WatchedFilms | null,
+}: {
+  filmRows?: Record<string, unknown>[];
+  watched?: WatchedFilms | null;
+} = {}) {
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "films") {
+        return {
+          select: vi.fn(() => ({
+            order: vi.fn(() => ({
+              order: vi.fn(async () => ({ data: filmRows })),
+            })),
+          })),
+        };
+      }
+      if (table === "progress") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: watched ? { watched } : null,
+              })),
+            })),
+          })),
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    }),
+  };
+}
+
+describe("root page load", () => {
+  it("groups films by year and renames the joined services key to service", async () => {
+    const supabase = fakeSupabaseForLoad({
+      filmRows: [
+        {
+          id: 1,
+          year: 2025,
+          date: "10/1/2025",
+          title: "Film A",
+          justwatch_url: null,
+          services: [
+            {
+              name: "Netflix",
+              type: "subscription",
+              price: null,
+              currency: "USD",
+              link: "https://netflix.com/1",
+              icon: "https://images.justwatch.com/netflix.webp",
+            },
+          ],
+        },
+        {
+          id: 2,
+          year: 2024,
+          date: "10/2/2024",
+          title: "Film B",
+          justwatch_url: "https://justwatch.com/film-b",
+          services: [],
+        },
+      ],
+    });
+    const safeGetSession = vi.fn(async () => ({ user: null }));
+
+    const result = await load({
+      locals: { supabase, safeGetSession },
+    } as unknown as Parameters<typeof load>[0]);
+
+    expect(result.filmsByYear).toEqual({
+      "2025": [
+        {
+          id: 1,
+          date: "10/1/2025",
+          title: "Film A",
+          justwatch_url: null,
+          service: [
+            {
+              name: "Netflix",
+              type: "subscription",
+              price: null,
+              currency: "USD",
+              link: "https://netflix.com/1",
+              icon: "https://images.justwatch.com/netflix.webp",
+            },
+          ],
+        },
+      ],
+      "2024": [
+        {
+          id: 2,
+          date: "10/2/2024",
+          title: "Film B",
+          justwatch_url: "https://justwatch.com/film-b",
+          service: [],
+        },
+      ],
+    });
+    expect(result.watched).toEqual({});
+  });
+
+  it("returns watched progress for the logged-in user alongside filmsByYear", async () => {
+    const supabase = fakeSupabaseForLoad({
+      filmRows: [],
+      watched: { "2025": ["Film A"] },
+    });
+    const safeGetSession = vi.fn(async () => ({ user: { id: "user-1" } }));
+
+    const result = await load({
+      locals: { supabase, safeGetSession },
+    } as unknown as Parameters<typeof load>[0]);
+
+    expect(result.watched).toEqual({ "2025": ["Film A"] });
+    expect(result.filmsByYear).toEqual({});
   });
 });
