@@ -6,14 +6,16 @@ export type ApplyResult = { ok: true } | { ok: false; error: string }
 
 // service.link is rendered as a public <a href> and service.icon as an
 // <img src> for every site visitor (see listing.svelte) -- both come from
-// the scraper, so reject anything that isn't a plain http(s) URL rather
-// than trusting it verbatim (e.g. a javascript: URI would be clickable-XSS
-// on the homepage).
+// the scraper, so reject anything that isn't a plain https URL rather than
+// trusting it verbatim (e.g. a javascript: URI would be clickable-XSS on
+// the homepage). https-only, not http: every current offer already uses
+// https (verified against production), so there's no legitimate case to
+// accommodate, and it avoids mixed-content issues on our https site.
 function sanitizeUrl(value: string | null): string | null {
     if (!value) return null
     try {
         const url = new URL(value)
-        return url.protocol === 'http:' || url.protocol === 'https:' ? value : null
+        return url.protocol === 'https:' ? value : null
     } catch {
         return null
     }

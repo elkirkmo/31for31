@@ -74,7 +74,7 @@ describe('applyFilmOffers', () => {
         expect(result).toEqual({ ok: false, error: 'insert failed' })
     })
 
-    it('keeps http(s) links and icons as-is', async () => {
+    it('keeps https links and icons as-is', async () => {
         const insert = vi.fn(async () => ({ error: null }))
         fromMock.mockReturnValue({
             delete: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
@@ -82,12 +82,24 @@ describe('applyFilmOffers', () => {
         })
 
         await applyFilmOffers(1, [
-            { ...offer('Tubi'), link: 'https://tubi.tv/1', icon: 'http://images.justwatch.com/tubi.webp' }
+            { ...offer('Tubi'), link: 'https://tubi.tv/1', icon: 'https://images.justwatch.com/tubi.webp' }
         ])
 
         expect(insert).toHaveBeenCalledWith([
-            expect.objectContaining({ link: 'https://tubi.tv/1', icon: 'http://images.justwatch.com/tubi.webp' })
+            expect.objectContaining({ link: 'https://tubi.tv/1', icon: 'https://images.justwatch.com/tubi.webp' })
         ])
+    })
+
+    it('strips a plain http link instead of storing it', async () => {
+        const insert = vi.fn(async () => ({ error: null }))
+        fromMock.mockReturnValue({
+            delete: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
+            insert
+        })
+
+        await applyFilmOffers(1, [{ ...offer('Tubi'), link: 'http://tubi.tv/1', icon: null }])
+
+        expect(insert).toHaveBeenCalledWith([expect.objectContaining({ link: null })])
     })
 
     it('strips a javascript: URI instead of storing it', async () => {
