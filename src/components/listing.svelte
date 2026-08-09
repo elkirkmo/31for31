@@ -80,7 +80,7 @@
             checked={watched}
             on:change={(e) => e.currentTarget.form?.requestSubmit()}
           />
-          <span class="watch-checkmark" />
+          <span class="watch-checkmark"></span>
           <span class="text-sm" class:text-green={watched}>Watched</span>
         </label>
       </form>
