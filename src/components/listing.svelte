@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
+  import Button from "./button.svelte";
 
   export let date: string;
   export let title: string;
@@ -13,6 +14,8 @@
   }[];
   export let year: string = "";
   export let watched: boolean | undefined = undefined;
+  export let visibleServices: Set<string> | undefined = undefined;
+  export let visiblePrices: Set<string> | undefined = undefined;
 
   const typeOrder = ["free", "subscription", "rent", "buy"];
 
@@ -21,7 +24,9 @@
       (s) =>
         s.type !== "cinema" &&
         !s.name.includes("Amazon Channel") &&
-        !s.name.includes("Apple TV Channel"),
+        !s.name.includes("Apple TV Channel") &&
+        (visibleServices === undefined || visibleServices.has(s.name)) &&
+        (visiblePrices === undefined || visiblePrices.has(s.type)),
     )
     .sort((a, b) => {
       const aIndex = typeOrder.indexOf(a.type);
@@ -94,19 +99,12 @@
     {#if i === 0 || s.type !== availableServices[i - 1].type}
       <h3 class="text-xl mb-2">{capitalize(s.type)}</h3>
     {/if}
-    <a target="_blank" href={s.link} rel="noopener noreferrer">
-      <button
-        type="button"
-        class="btn bg-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full mb-4 mr-[1pc] inline-flex items-center gap-2"
-      >
-        <img
-          src={s.icon}
-          alt="{s.name} icon"
-          class="w-8 h-8 rounded-full object-cover"
-        />
-        {buttonText(s)}
-      </button></a
-    >
+    <Button
+      href={s.link}
+      icon={s.icon}
+      iconAlt="{s.name} icon"
+      text={buttonText(s)}
+    />
   {/each}
   {#if availableServices.length === 0}
     <h3>Streaming unavailable</h3>

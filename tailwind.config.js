@@ -5,6 +5,7 @@ export default {
     colors: {
       green: '#66cc33',
       white: '#ffffff',
+      black: '#000000',
     },
     fontFamily: {
       display: ['Vollkorn', 'serif'],
