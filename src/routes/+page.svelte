@@ -5,7 +5,9 @@
   inject({ mode: dev ? "development" : "production" });
 
   import Listing from "../components/listing.svelte";
+  import Filter from "../components/filter.svelte";
   import siteData from "../data.json";
+  import { collectFilterOptions } from "$lib/services";
 
   export let data;
 
@@ -13,6 +15,9 @@
   let selectedYear = "2025";
   $: films = data.filmsByYear[selectedYear] ?? [];
   $: watchedForYear = (data.watched?.[selectedYear] ?? []) as string[];
+  $: filterOptions = collectFilterOptions(films);
+  let selectedServices: Set<string> | undefined = undefined;
+  let selectedPrices: Set<string> | undefined = undefined;
 
   const {
     heading,
@@ -72,6 +77,15 @@
   {/each}
 </ul>
 
+{#key selectedYear}
+  <Filter
+    services={filterOptions.services}
+    prices={filterOptions.prices}
+    bind:selectedServices
+    bind:selectedPrices
+  />
+{/key}
+
 {#each films as film}
   <Listing
     date={film.date}
@@ -79,5 +93,7 @@
     service={film.service}
     year={selectedYear}
     watched={data.session ? watchedForYear.includes(film.title) : undefined}
+    visibleServices={selectedServices}
+    visiblePrices={selectedPrices}
   />
 {/each}

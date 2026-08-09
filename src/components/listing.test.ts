@@ -282,3 +282,77 @@ describe("streaming service buttons", () => {
     ]);
   });
 });
+
+describe("filtering by visibleServices/visiblePrices", () => {
+  const services = [
+    {
+      name: "Netflix",
+      link: "https://netflix.com/1",
+      type: "subscription",
+      price: null,
+      currency: "USD",
+    },
+    {
+      name: "Tubi",
+      link: "https://tubitv.com/1",
+      type: "free",
+      price: null,
+      currency: "USD",
+    },
+  ];
+
+  it("shows every service when visibleServices/visiblePrices are undefined", () => {
+    render(Listing, { ...baseProps, service: services });
+
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+  });
+
+  it("hides services not in visibleServices", () => {
+    render(Listing, {
+      ...baseProps,
+      service: services,
+      visibleServices: new Set(["Netflix"]),
+    });
+
+    expect(screen.getByRole("link", { name: /Netflix/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Tubi/ })).not.toBeInTheDocument();
+  });
+
+  it("hides services not in visiblePrices", () => {
+    render(Listing, {
+      ...baseProps,
+      service: services,
+      visiblePrices: new Set(["free"]),
+    });
+
+    expect(screen.getByRole("link", { name: /Tubi/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Netflix/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows 'Streaming unavailable' when the filters exclude every service", () => {
+    render(Listing, {
+      ...baseProps,
+      service: services,
+      visibleServices: new Set<string>(),
+    });
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("Streaming unavailable")).toBeInTheDocument();
+  });
+
+  it("applies both filters together", () => {
+    render(Listing, {
+      ...baseProps,
+      service: services,
+      visibleServices: new Set(["Netflix", "Tubi"]),
+      visiblePrices: new Set(["free"]),
+    });
+
+    expect(screen.getByRole("link", { name: /Tubi/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Netflix/ }),
+    ).not.toBeInTheDocument();
+  });
+});
