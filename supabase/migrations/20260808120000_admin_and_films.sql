@@ -73,3 +73,22 @@ create index services_film_id_idx on public.services (film_id);
 -- insert into public.profiles (id, is_admin)
 -- values ('<uuid from auth.users>', true)
 -- on conflict (id) do update set is_admin = true;
+
+-- ── explicit grants ────────────────────────────────────────────────
+-- Newer Supabase projects (and the local CLI, as of the config's
+-- `auto_expose_new_tables` note) no longer auto-expose new public-schema
+-- tables to the API roles without explicit GRANTs. The hosted project this
+-- app runs on predates that default, so these were working by accident;
+-- granting explicitly here makes local and remote behave the same and
+-- doesn't depend on a legacy default that's already being phased out.
+grant select on public.profiles to anon, authenticated;
+grant all on public.profiles to service_role;
+
+grant select on public.films to anon, authenticated;
+grant all on public.films to service_role;
+
+grant select on public.services to anon, authenticated;
+grant all on public.services to service_role;
+
+grant usage on sequence public.films_id_seq to service_role;
+grant usage on sequence public.services_id_seq to service_role;
