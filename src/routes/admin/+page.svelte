@@ -1,1 +1,1 @@
-<p>Films and streaming-offer management land here next.</p>
+<a href="/admin/films" class="text-green underline">Films</a>
