@@ -66,6 +66,10 @@ create policy "services_admin_write" on public.services for all
   using (public.is_admin()) with check (public.is_admin());
 create index services_film_id_idx on public.services (film_id);
 
--- bootstrap (run manually, once, AFTER the intended admin has logged in at
--- least once so the trigger has created their profiles row):
--- update public.profiles set is_admin = true where id = '<uuid from auth.users>';
+-- bootstrap (run manually, once). Uses insert ... on conflict rather than a
+-- plain update: an update silently matches zero rows if the trigger hasn't
+-- created the profiles row yet (e.g. run before the intended admin has ever
+-- logged in), which is easy to miss.
+-- insert into public.profiles (id, is_admin)
+-- values ('<uuid from auth.users>', true)
+-- on conflict (id) do update set is_admin = true;
