@@ -9,7 +9,7 @@
 
   export let data;
 
-  $: years = Object.keys(data.filmsByYear);
+  $: years = Object.keys(data.filmsByYear).reverse();
   let selectedYear = "2025";
   $: films = data.filmsByYear[selectedYear] ?? [];
   $: watchedForYear = (data.watched?.[selectedYear] ?? []) as string[];
