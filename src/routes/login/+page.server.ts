@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit'
 import { env } from '$env/dynamic/private'
+import { dev } from '$app/environment'
 import type { Actions, PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession } }) => {
@@ -23,6 +24,8 @@ export const actions: Actions = {
     },
 
     devLogin: async ({ locals: { supabase } }) => {
+        if (!dev) return { error: 'Dev login is not available.' }
+
         const { DEV_LOGIN_EMAIL, DEV_LOGIN_PASSWORD } = env
         if (!DEV_LOGIN_EMAIL || !DEV_LOGIN_PASSWORD) {
             return { error: 'Dev login is not configured. Set DEV_LOGIN_EMAIL and DEV_LOGIN_PASSWORD in .env.local.' }

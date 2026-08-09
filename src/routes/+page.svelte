@@ -9,9 +9,9 @@
 
   export let data;
 
-  const years = Object.keys(siteData).filter((k) => k !== "textContent");
+  $: years = Object.keys(data.filmsByYear);
   let selectedYear = "2025";
-  $: films = siteData[selectedYear as "2024" | "2025"];
+  $: films = data.filmsByYear[selectedYear] ?? [];
   $: watchedForYear = (data.watched?.[selectedYear] ?? []) as string[];
 
   const {

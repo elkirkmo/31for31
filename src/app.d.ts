@@ -12,6 +12,7 @@ declare global {
 		}
 		interface PageData {
 			session: Session | null
+			isAdmin: boolean
 		}
 		// interface PageState {}
 		// interface Platform {}
