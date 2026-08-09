@@ -4,7 +4,10 @@
 
 <div class="flex items-center justify-between mb-4">
   <h2 class="text-2xl font-display">Films</h2>
-  <a href="/admin/films/new" class="text-sm text-green underline">+ Add film</a>
+  <div class="flex gap-4">
+    <a href="/admin/refresh" class="text-sm text-green underline">Refresh offers</a>
+    <a href="/admin/films/new" class="text-sm text-green underline">+ Add film</a>
+  </div>
 </div>
 
 {#each Object.entries(data.filmsByYear) as [year, films]}

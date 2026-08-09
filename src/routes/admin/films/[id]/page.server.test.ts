@@ -6,8 +6,15 @@ vi.mock('$lib/server/requireAdmin', () => ({
 }))
 
 const replaceYearMock = vi.fn()
+const scrapeOneMock = vi.fn()
 vi.mock('$lib/server/scraperClient', () => ({
-    replaceYear: (...args: unknown[]) => replaceYearMock(...args)
+    replaceYear: (...args: unknown[]) => replaceYearMock(...args),
+    scrapeOne: (...args: unknown[]) => scrapeOneMock(...args)
+}))
+
+const applyFilmOffersMock = vi.fn()
+vi.mock('$lib/server/applyOffers', () => ({
+    applyFilmOffers: (...args: unknown[]) => applyFilmOffersMock(...args)
 }))
 
 const fromMock = vi.fn()
@@ -151,5 +158,87 @@ describe('admin film [id] actions', () => {
             { title: 'Film B', date: '10/2/2025', justwatch_url: 'https://x' }
         ])
         expect(result).toEqual({ success: true, deleted: true })
+    })
+})
+
+describe('admin film [id] rescrape actions', () => {
+    beforeEach(() => {
+        fromMock.mockReset()
+        scrapeOneMock.mockReset()
+        applyFilmOffersMock.mockReset()
+    })
+
+    function offer(name: string, overrides: Record<string, unknown> = {}) {
+        return { name, type: 'free', price: null, currency: null, link: null, icon: null, ...overrides }
+    }
+
+    it('rescrape diffs a fresh scrape against stored offers without writing', async () => {
+        fromMock.mockImplementation(() =>
+            makeFilmsBuilder([
+                {
+                    id: 1,
+                    title: 'Film A',
+                    justwatch_url: null,
+                    services: [offer('Netflix', { type: 'subscription' })]
+                }
+            ])
+        )
+        scrapeOneMock.mockResolvedValue({
+            ok: true,
+            data: { title: 'Film A', service: [offer('Netflix', { type: 'subscription' }), offer('Tubi')] }
+        })
+
+        const result = await actions.rescrape({
+            params: { id: '1' },
+            locals: {}
+        } as unknown as Parameters<typeof actions.rescrape>[0])
+
+        expect(result).toEqual({ rescrapePreview: { added: 1, removed: 0, changed: 0, unchanged: 1 } })
+        expect(applyFilmOffersMock).not.toHaveBeenCalled()
+    })
+
+    it('rescrape returns the inline scrape error', async () => {
+        fromMock.mockImplementation(() =>
+            makeFilmsBuilder([{ id: 1, title: 'Not A Real Movie', justwatch_url: null, services: [] }])
+        )
+        scrapeOneMock.mockResolvedValue({
+            ok: true,
+            data: { title: 'Not A Real Movie', service: [], error: 'No JustWatch page found' }
+        })
+
+        const result = await actions.rescrape({
+            params: { id: '1' },
+            locals: {}
+        } as unknown as Parameters<typeof actions.rescrape>[0])
+
+        expect(result).toEqual({ error: 'No JustWatch page found' })
+    })
+
+    it('applyRescrape re-scrapes fresh and applies it', async () => {
+        fromMock.mockImplementation(() => makeFilmsBuilder([{ id: 1, title: 'Film A', justwatch_url: null }]))
+        scrapeOneMock.mockResolvedValue({ ok: true, data: { title: 'Film A', service: [offer('Tubi')] } })
+        applyFilmOffersMock.mockResolvedValue({ ok: true })
+
+        const result = await actions.applyRescrape({
+            params: { id: '1' },
+            locals: {}
+        } as unknown as Parameters<typeof actions.applyRescrape>[0])
+
+        expect(scrapeOneMock).toHaveBeenCalledWith('Film A', undefined)
+        expect(applyFilmOffersMock).toHaveBeenCalledWith(1, [offer('Tubi')])
+        expect(result).toEqual({ rescraped: true })
+    })
+
+    it('applyRescrape surfaces an apply failure', async () => {
+        fromMock.mockImplementation(() => makeFilmsBuilder([{ id: 1, title: 'Film A', justwatch_url: null }]))
+        scrapeOneMock.mockResolvedValue({ ok: true, data: { title: 'Film A', service: [offer('Tubi')] } })
+        applyFilmOffersMock.mockResolvedValue({ ok: false, error: 'insert failed' })
+
+        const result = await actions.applyRescrape({
+            params: { id: '1' },
+            locals: {}
+        } as unknown as Parameters<typeof actions.applyRescrape>[0])
+
+        expect(result).toEqual({ error: 'insert failed' })
     })
 })
