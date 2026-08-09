@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/svelte/svelte5";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/svelte/svelte5";
 import Listing from "./listing.svelte";
 
 const baseProps = {
@@ -38,6 +38,24 @@ describe("watched checkbox", () => {
 
     expect(screen.getByRole("checkbox")).toBeChecked();
     expect(screen.getByText("Watched")).toHaveClass("text-green");
+  });
+
+  it("does not strike through the title when watched is false or undefined", () => {
+    render(Listing, { ...baseProps, service: [], watched: false });
+    expect(screen.getByText(baseProps.title)).not.toHaveClass("line-through");
+
+    cleanup();
+    render(Listing, { ...baseProps, service: [], watched: undefined });
+    expect(screen.getByText(baseProps.title)).not.toHaveClass("line-through");
+  });
+
+  it("puts a green strikethrough through the title when watched is true", () => {
+    render(Listing, { ...baseProps, service: [], watched: true });
+
+    expect(screen.getByText(baseProps.title)).toHaveClass(
+      "line-through",
+      "decoration-green",
+    );
   });
 
   it("submits the toggleWatched form when clicked", async () => {
@@ -354,5 +372,61 @@ describe("filtering by visibleServices/visiblePrices", () => {
     expect(
       screen.queryByRole("link", { name: /Netflix/ }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("hiding services once watched", () => {
+  const services = [
+    {
+      name: "Tubi",
+      link: "https://tubitv.com/1",
+      type: "free",
+      price: null,
+      currency: "USD",
+    },
+  ];
+
+  it("does not render service buttons when watched is true from the start", () => {
+    render(Listing, { ...baseProps, service: services, watched: true });
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByText("Streaming unavailable")).not.toBeInTheDocument();
+  });
+
+  it("shows service buttons when watched is false", () => {
+    render(Listing, { ...baseProps, service: services, watched: false });
+
+    expect(screen.getByRole("link", { name: /Tubi/ })).toBeInTheDocument();
+  });
+
+  it("animates service buttons away once watched flips to true", async () => {
+    const { rerender } = render(Listing, {
+      ...baseProps,
+      service: services,
+      watched: false,
+    });
+
+    expect(screen.getByRole("link", { name: /Tubi/ })).toBeInTheDocument();
+
+    await rerender({ ...baseProps, service: services, watched: true });
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("link")).not.toBeInTheDocument();
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it("brings service buttons back when watched flips back to false", async () => {
+    const { rerender } = render(Listing, {
+      ...baseProps,
+      service: services,
+      watched: true,
+    });
+
+    await rerender({ ...baseProps, service: services, watched: false });
+
+    expect(screen.getByRole("link", { name: /Tubi/ })).toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
+  import { cubicOut } from "svelte/easing";
   import Button from "./button.svelte";
 
   export let date: string;
@@ -37,6 +38,8 @@
       );
     });
 
+  $: shownServices = watched === true ? [] : availableServices;
+
   const formatPrice = (price: number, currency?: string | null) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -63,12 +66,35 @@
   };
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  function poof(
+    node: Element,
+    { delay = 0, duration = 400 }: { delay?: number; duration?: number } = {},
+  ) {
+    return {
+      delay,
+      duration,
+      easing: cubicOut,
+      css: (t: number, u: number) => `
+        opacity: ${t};
+        transform: scale(${t}) translateY(${-u * 20}px) rotate(${u * 20}deg);
+        filter: blur(${u * 5}px);
+        pointer-events: ${t < 1 ? "none" : "auto"};
+      `,
+    };
+  }
 </script>
 
 <div class="mb-5 font-display">
   <b class="text-green">{date}</b>
   <div class="flex items-center justify-center mb-4">
-    <h3 class="text-4xl">{title}</h3>
+    <h3
+      class="text-4xl"
+      class:line-through={watched === true}
+      class:decoration-green={watched === true}
+    >
+      {title}
+    </h3>
 
     {#if watched !== undefined}
       <form
@@ -92,21 +118,23 @@
     {/if}
   </div>
 
-  {#each availableServices as s, i}
-    {#if i > 0 && s.type !== availableServices[i - 1].type}
+  {#each shownServices as s, i}
+    {#if i > 0 && s.type !== shownServices[i - 1].type}
       <hr class="w-full border-t-2 border-white mb-5" />
     {/if}
-    {#if i === 0 || s.type !== availableServices[i - 1].type}
+    {#if i === 0 || s.type !== shownServices[i - 1].type}
       <h3 class="text-xl mb-2">{capitalize(s.type)}</h3>
     {/if}
-    <Button
-      href={s.link}
-      icon={s.icon}
-      iconAlt="{s.name} icon"
-      text={buttonText(s)}
-    />
+    <span class="inline-block" in:poof out:poof={{ delay: i * 60 }}>
+      <Button
+        href={s.link}
+        icon={s.icon}
+        iconAlt="{s.name} icon"
+        text={buttonText(s)}
+      />
+    </span>
   {/each}
-  {#if availableServices.length === 0}
+  {#if shownServices.length === 0 && watched !== true}
     <h3>Streaming unavailable</h3>
   {/if}
 </div>
