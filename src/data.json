@@ -6476,6 +6476,14 @@
         },
         "heading": "31 for 31",
         "headingPrefix": "Last Podcast on the Left presents: ",
+        "login": {
+            "heading": "Sign in",
+            "intro": "You don't need an account to browse the list or find out where to stream anything. An account exists for one reason: so the films you tick off stay ticked off next time you visit.",
+            "legalHeading": "The boring but important part",
+            "legalText": "This is a hobby project, not a business. Your email address is used for exactly one thing — sending you the link that signs you in. It will never be sold, rented, or shared with anyone, and you will never get marketing, newsletters, or any other email from this site. The only other thing kept against your account is the list of films you've marked as watched. Want it all deleted? Ask through",
+            "legalLinkText": "github",
+            "legalSuffix": " and it's gone."
+        },
         "podcastLinkText": "Last Podcast on the Left: Side Stories",
         "podcastLinkUrl": "https://open.spotify.com/episode/1P11eNk7cJzwRtJOk7KCaV?si=881b4ced12e24d92",
         "subheading": "Movies to Watch This October"

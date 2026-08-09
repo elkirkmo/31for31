@@ -40,6 +40,10 @@
 
   $: shownServices = watched === true ? [] : availableServices;
 
+  // `watched === undefined` means nobody is logged in: the checkbox is still
+  // shown, but inert, with a hint pointing at the login page.
+  $: hintId = `watch-hint-${year}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
   const formatPrice = (price: number, currency?: string | null) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -96,26 +100,39 @@
       {title}
     </h3>
 
-    {#if watched !== undefined}
-      <form
-        method="POST"
-        action="?/toggleWatched"
-        use:enhance
-        class="pl-[30px]"
-      >
-        <input type="hidden" name="title" value={title} />
-        <input type="hidden" name="year" value={year} />
-        <label class="watch-checkbox">
+    <div class="watch-hint ml-[30px] shrink-0">
+      {#if watched === undefined}
+        <label class="watch-checkbox watch-checkbox--locked">
           <input
             type="checkbox"
-            checked={watched}
-            on:change={(e) => e.currentTarget.form?.requestSubmit()}
+            checked={false}
+            aria-disabled="true"
+            aria-describedby={hintId}
+            on:click={(e) => e.preventDefault()}
           />
           <span class="watch-checkmark"></span>
-          <span class="text-sm" class:text-green={watched}>Watched</span>
+          <span class="text-sm">Watched</span>
         </label>
-      </form>
-    {/if}
+        <span id={hintId} class="watch-tooltip text-sm">
+          Create an account to save progress.
+          <a href="/login" class="text-green underline">Log in</a>
+        </span>
+      {:else}
+        <form method="POST" action="?/toggleWatched" use:enhance>
+          <input type="hidden" name="title" value={title} />
+          <input type="hidden" name="year" value={year} />
+          <label class="watch-checkbox">
+            <input
+              type="checkbox"
+              checked={watched}
+              on:change={(e) => e.currentTarget.form?.requestSubmit()}
+            />
+            <span class="watch-checkmark"></span>
+            <span class="text-sm" class:text-green={watched}>Watched</span>
+          </label>
+        </form>
+      {/if}
+    </div>
   </div>
 
   {#each shownServices as s, i}
@@ -157,6 +174,105 @@
     cursor: pointer;
     height: 0;
     width: 0;
+  }
+
+  .watch-checkbox input:focus-visible ~ .watch-checkmark {
+    outline: 2px solid #66cc33;
+    outline-offset: 3px;
+  }
+
+  /* Logged-out state: present, but visibly inert. */
+  .watch-checkbox--locked,
+  .watch-checkbox--locked input {
+    cursor: help;
+  }
+
+  .watch-checkbox--locked .watch-checkmark {
+    opacity: 0.5;
+  }
+
+  .watch-checkbox--locked .watch-checkmark::before {
+    animation: none;
+    opacity: 0.2;
+  }
+
+  .watch-hint:hover .watch-checkbox--locked .watch-checkmark,
+  .watch-hint:focus-within .watch-checkbox--locked .watch-checkmark {
+    opacity: 0.85;
+  }
+
+  .watch-hint {
+    position: relative;
+    display: inline-flex;
+    /* Vertical-only padding: enlarges the hover target without shifting the
+       checkbox in its centred flex row. */
+    padding: 0.4em 0;
+  }
+
+  .watch-tooltip {
+    position: absolute;
+    bottom: calc(100% + 0.35em);
+    right: -0.5rem;
+    z-index: 20;
+    width: max-content;
+    max-width: min(16rem, 70vw);
+    padding: 0.5em 0.75em;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 0.5rem;
+    background-color: #000000;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.9);
+    text-align: left;
+    opacity: 0;
+    transform: translateY(0.35em);
+    pointer-events: none;
+    /* Appears instantly on hover, but lingers before fading so the pointer has
+       time to travel down to the link. The delay is cancelled while hovered. */
+    transition:
+      opacity 0.2s ease 0.4s,
+      transform 0.2s ease 0.4s,
+      pointer-events 0.2s ease 0.4s;
+    /* Keeps pointer-events on through the fade, so the link stays clickable
+       during the grace period rather than only while strictly hovered. */
+    transition-behavior: allow-discrete;
+  }
+
+  /* Invisible bridge across the gap between checkbox and tooltip, so moving the
+     pointer between the two never leaves the hover area. */
+  .watch-tooltip::before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 1em;
+  }
+
+  /* Downward-pointing arrow tucked under the "Watched" label. */
+  .watch-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 1.5rem;
+    border: 0.4rem solid transparent;
+    border-top-color: rgba(255, 255, 255, 0.25);
+  }
+
+  .watch-hint:hover .watch-tooltip,
+  .watch-hint:focus-within .watch-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No movement or fade, but keep the grace period before it disappears. */
+    .watch-tooltip {
+      transform: none;
+      transition:
+        opacity 0s linear 0.4s,
+        pointer-events 0s linear 0.4s;
+    }
   }
 
   .watch-checkmark {

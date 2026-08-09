@@ -2,9 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/svelte/svelte5";
 import Listing from "./listing.svelte";
 
+// Defaults to the logged-in-but-unwatched state so the service-button and
+// filter suites below aren't picking up the logged-out "Log in" hint link.
 const baseProps = {
   date: "10/1/2025",
   title: "The Thing From Another World",
+  watched: false,
 };
 
 let originalRequestSubmit: typeof HTMLFormElement.prototype.requestSubmit;
@@ -20,10 +23,49 @@ afterEach(() => {
 });
 
 describe("watched checkbox", () => {
-  it("is not rendered when watched is undefined (logged out)", () => {
+  it("renders an inert, unchecked checkbox when watched is undefined (logged out)", () => {
     render(Listing, { ...baseProps, service: [], watched: undefined });
 
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    const checkbox = screen.getByRole("checkbox");
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).not.toBeChecked();
+    expect(checkbox).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("does not toggle or submit anything when the logged-out checkbox is clicked", async () => {
+    render(Listing, { ...baseProps, service: [], watched: undefined });
+
+    const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
+    await fireEvent.click(checkbox);
+
+    expect(checkbox).not.toBeChecked();
+    expect(HTMLFormElement.prototype.requestSubmit).not.toHaveBeenCalled();
+  });
+
+  it("describes the logged-out checkbox with a hint linking to the login page", () => {
+    render(Listing, { ...baseProps, service: [], watched: undefined });
+
+    const hint = screen.getByText(/Create an account to save progress/);
+    expect(screen.getByRole("checkbox")).toHaveAttribute(
+      "aria-describedby",
+      hint.id,
+    );
+
+    expect(screen.getByRole("link", { name: "Log in" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+  });
+
+  it("does not render the login hint once a user is logged in", () => {
+    render(Listing, { ...baseProps, service: [], watched: false });
+
+    expect(
+      screen.queryByText(/Create an account to save progress/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Log in" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders unchecked with a plain label when watched is false", () => {
@@ -395,6 +437,12 @@ describe("hiding services once watched", () => {
 
   it("shows service buttons when watched is false", () => {
     render(Listing, { ...baseProps, service: services, watched: false });
+
+    expect(screen.getByRole("link", { name: /Tubi/ })).toBeInTheDocument();
+  });
+
+  it("still shows service buttons when logged out", () => {
+    render(Listing, { ...baseProps, service: services, watched: undefined });
 
     expect(screen.getByRole("link", { name: /Tubi/ })).toBeInTheDocument();
   });
