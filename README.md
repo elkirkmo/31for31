@@ -30,8 +30,11 @@ Because this hits the real database, toggling "watched" checkboxes while develop
 1. Run `supabase/migrations/0001_admin_and_films.sql` in the Supabase SQL editor. Creates `profiles`, `films`, and `services`, plus a trigger that auto-creates a `profiles` row for every new auth user.
 2. Log in once (magic link or the dev login button) so the trigger creates your `profiles` row, then find your uuid under Authentication → Users in the Supabase dashboard and run:
    ```sql
-   update public.profiles set is_admin = true where id = '<your uuid>';
+   insert into public.profiles (id, is_admin)
+   values ('<your uuid>', true)
+   on conflict (id) do update set is_admin = true;
    ```
+   Use `insert ... on conflict`, not a plain `update` — an `update` silently matches zero rows (no error) if the trigger hasn't created your `profiles` row yet, which is easy to miss. Verify it worked with `select id, is_admin from public.profiles where id = '<your uuid>';` before moving on.
 3. Add `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` (Supabase dashboard → Project Settings → API → `service_role` secret) — the admin pages use it to bypass RLS.
 4. Run `npm run migrate:data` once to import `src/data.json`'s films/services into the new tables. Idempotent, so safe to re-run, but only needs to happen once per project.
 
