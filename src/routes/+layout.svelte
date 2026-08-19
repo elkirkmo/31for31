@@ -24,6 +24,7 @@
         <a href="/admin" class="text-sm text-green underline">Admin (dev)</a>
       {/if}
       {#if data.session}
+        <a href="/account" class="text-sm text-green underline">My Account</a>
         <form method="POST" action="/logout" use:enhance>
           <button type="submit" class="text-sm text-green underline"
             >Log out</button

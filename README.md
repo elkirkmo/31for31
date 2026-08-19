@@ -49,7 +49,7 @@ Local dev gets this for free from `npm run db:reset` (see "Development" above �
    on conflict (id) do update set is_admin = true;
    ```
    Use `insert ... on conflict`, not a plain `update` — an `update` silently matches zero rows (no error) if the trigger hasn't created your `profiles` row yet, which is easy to miss. Verify it worked with `select id, is_admin from public.profiles where id = '<your uuid>';` before moving on.
-3. Set `SUPABASE_SERVICE_ROLE_KEY` (that project's value, Project Settings → API → `service_role` secret) wherever the admin pages run against it — the admin pages use it to bypass RLS.
+3. Set `SUPABASE_SERVICE_ROLE_KEY` (that project's value, Project Settings → API → `service_role` secret) wherever the app runs — not just where you use the admin pages. It's used to bypass RLS for admin CRUD *and* for self-service account deletion on `/account`, so it's required in every environment (see "User accounts" below).
 4. Run `npm run migrate:data`, pointed at that project, to import `src/data.json`'s films/services. Idempotent, so safe to re-run, but only needs to happen once per project.
 
 After that, the homepage reads films/services from Supabase instead of `src/data.json` (`data.json` is still used for the page's `textContent` copy — that part hasn't moved).
@@ -61,6 +61,36 @@ In `npm run dev`, an "Admin (dev)" link appears in the header for any logged-in 
 ### Editing films
 
 `/admin/films` add/edit/delete calls the [31for31scraper](https://31for31scraper.vercel.app) API rather than writing to Supabase directly, so it needs `SCRAPER_API_KEY` in `.env.local` (must match that service's own `ADMIN_API_KEY`). **Known limitation:** the scraper's write endpoints currently persist only to its own `data.json`, which is read-only on Vercel production — writes succeed against the scraper but won't take effect until the scraper migrates its storage to Supabase. Called out in the admin UI itself, not just here.
+
+## User accounts
+
+Accounts are optional. The film list and streaming links work fully logged out — an account exists only so a user's watched films persist between visits. Signed-in users get `/account`, which lists everything stored about them (their email address and their watched films) and lets them delete the account themselves, without an admin in the loop.
+
+### Deletion is self-service, and only ever self
+
+**If you fork this, read this before touching the delete action.**
+
+`/account`'s `deleteAccount` action deletes a Supabase auth user using the service-role key, which is capable of deleting *any* user. The only thing that stops it doing so is that the action reads no identifier from the request at all:
+
+```ts
+const { user } = await safeGetSession()
+if (!user) throw redirect(303, '/login')
+await supabaseAdmin.auth.admin.deleteUser(user.id)
+```
+
+`user.id` comes from `safeGetSession()`, which validates the JWT via `getUser()` (see `src/hooks.server.ts`) rather than trusting the session cookie as-is. There is no email, id, or any other parameter in the form body — so there is no attacker-controlled input, and therefore no authorization check that can be written incorrectly. The property is structural, not a guard clause.
+
+Adding an identifier parameter to that action — a hidden form field, a query param, "just for admins" — converts it into an endpoint that deletes arbitrary accounts on request, protected by nothing. Don't. `src/routes/account/page.server.test.ts` posts `email`, `id`, and `user_id` for a different user and asserts the caller's own id is still the only one deleted; keep that test.
+
+Deleting the auth user is the whole operation: `profiles` and `progress` both foreign-key to `auth.users(id)` with `ON DELETE CASCADE`, so their rows go with it. Nothing else needs cleaning up.
+
+### `SUPABASE_SERVICE_ROLE_KEY` is required in every environment
+
+Not just where you intend to use `/admin`. Because account deletion runs through it, the key is now load-bearing for a **user-facing** route. `src/lib/server/supabaseAdmin.ts` throws at import time when the variable is unset, so a deployment missing it does not degrade gracefully — `/account` errors for logged-in users. Set it wherever the app runs.
+
+### The login page makes privacy promises on your behalf
+
+`/login` tells users their email is used only for the sign-in link, is never sold or shared, and that they will never receive marketing email. That copy lives in `src/data.json` under `textContent.login`. If you fork this and intend to do anything else with user email addresses, change the copy to match what you actually do.
 
 ## Building
 
