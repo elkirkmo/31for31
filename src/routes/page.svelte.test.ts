@@ -122,14 +122,36 @@ describe("progress bar", () => {
   it("totals against the year's own film count, 31 one year and 32 the next", async () => {
     await renderPage({
       session: { user: { id: "user-1" } },
-      watched: { "2025": ["Film 2025 #1"] },
+      watched: {
+        "2025": ["Film 2025 #1"],
+        "2024": ["Film 2024 #1", "Film 2024 #2"],
+      },
     });
 
     expect(screen.getByText("1 of 31 watched")).toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "2024" }));
 
-    expect(screen.getByText("0 of 32 watched")).toBeInTheDocument();
+    expect(screen.getByText("2 of 32 watched")).toBeInTheDocument();
+  });
+
+  it("is hidden for a logged-in reader who has ticked nothing this year", async () => {
+    await renderPage({ session: { user: { id: "user-1" } }, watched: {} });
+
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("stays hidden on a year with no ticks even when another year has some", async () => {
+    await renderPage({
+      session: { user: { id: "user-1" } },
+      watched: { "2025": ["Film 2025 #1"] },
+    });
+
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "2024" }));
+
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   it("reaches 100% on a 32-film year only when all 32 are ticked", async () => {

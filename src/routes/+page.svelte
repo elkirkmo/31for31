@@ -101,7 +101,10 @@
   {/each}
 </ul>
 
-{#if data.session}
+<!-- Only worth showing once there's progress to show: logged-out readers
+     have none, and a logged-in reader who hasn't ticked anything this year
+     would just get an empty bar. -->
+{#if data.session && watchedCount > 0}
   <ProgressBar watched={watchedCount} total={films.length} year={selectedYear} />
 {/if}
 
