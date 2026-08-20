@@ -2,6 +2,7 @@
   import { enhance } from "$app/forms";
   import { cubicOut } from "svelte/easing";
   import Button from "./button.svelte";
+  import { displayFilmDate } from "$lib/filmDate";
 
   export let date: string;
   export let title: string;
@@ -90,7 +91,7 @@
 </script>
 
 <div class="mb-5 font-display">
-  <b class="text-green">{date}</b>
+  <b class="text-green">{displayFilmDate(date)}</b>
   <div class="flex items-center justify-center mb-4">
     <h3
       class="text-4xl"
