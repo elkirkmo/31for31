@@ -13,13 +13,21 @@ vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 
 import HomePage from "./+page.svelte";
 
+// Real per-year counts: 2024 ran to 32 films, 2025 to 31. The progress bar's
+// total has to follow the year rather than assuming October's 31 days.
+function yearOfFilms(year: string, count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: Number(year) * 100 + i,
+    date: `10/${i + 1}/${year}`,
+    title: `Film ${year} #${i + 1}`,
+    justwatch_url: null,
+    service: [],
+  }));
+}
+
 const filmsByYear = {
-  "2024": [
-    { id: 1, date: "10/1/2024", title: "Film 2024", justwatch_url: null, service: [] },
-  ],
-  "2025": [
-    { id: 2, date: "10/1/2025", title: "Film 2025", justwatch_url: null, service: [] },
-  ],
+  "2024": yearOfFilms("2024", 32),
+  "2025": yearOfFilms("2025", 31),
 };
 
 // Only filmsByYear/watched/session are read by this component; the rest of
@@ -58,7 +66,7 @@ describe("year selection", () => {
     await renderPage();
 
     expect(selectedTab()).toBe("2025");
-    expect(screen.getByText("Film 2025")).toBeInTheDocument();
+    expect(screen.getByText("Film 2025 #1")).toBeInTheDocument();
   });
 
   it("restores the year the reader last picked", async () => {
@@ -72,7 +80,7 @@ describe("year selection", () => {
     await renderPage();
 
     expect(selectedTab()).toBe("2024");
-    expect(screen.getByText("Film 2024")).toBeInTheDocument();
+    expect(screen.getByText("Film 2024 #1")).toBeInTheDocument();
   });
 
   it("falls back to the newest year when the stored one is no longer shown", async () => {
@@ -94,10 +102,10 @@ describe("progress bar", () => {
   it("counts the logged-in reader's watched films for the selected year", async () => {
     await renderPage({
       session: { user: { id: "user-1" } },
-      watched: { "2025": ["Film 2025"] },
+      watched: { "2025": ["Film 2025 #1"] },
     });
 
-    expect(screen.getByText("1 of 1 watched")).toBeInTheDocument();
+    expect(screen.getByText("1 of 31 watched")).toBeInTheDocument();
   });
 
   it("ignores watched titles that are not in the year's film list", async () => {
@@ -105,22 +113,35 @@ describe("progress bar", () => {
     // total and could push the bar past 100%.
     await renderPage({
       session: { user: { id: "user-1" } },
-      watched: { "2025": ["Film 2025", "Renamed Since"] },
+      watched: { "2025": ["Film 2025 #1", "Renamed Since"] },
     });
 
-    expect(screen.getByText("1 of 1 watched")).toBeInTheDocument();
+    expect(screen.getByText("1 of 31 watched")).toBeInTheDocument();
   });
 
-  it("recounts when the reader switches year", async () => {
+  it("totals against the year's own film count, 31 one year and 32 the next", async () => {
     await renderPage({
       session: { user: { id: "user-1" } },
-      watched: { "2025": ["Film 2025"] },
+      watched: { "2025": ["Film 2025 #1"] },
     });
 
-    expect(screen.getByText("1 of 1 watched")).toBeInTheDocument();
+    expect(screen.getByText("1 of 31 watched")).toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "2024" }));
 
-    expect(screen.getByText("0 of 1 watched")).toBeInTheDocument();
+    expect(screen.getByText("0 of 32 watched")).toBeInTheDocument();
+  });
+
+  it("reaches 100% on a 32-film year only when all 32 are ticked", async () => {
+    const all2024 = filmsByYear["2024"].map((film) => film.title);
+
+    await renderPage({
+      session: { user: { id: "user-1" } },
+      watched: { "2024": all2024 },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "2024" }));
+
+    expect(screen.getByText("32 of 32 watched")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
   });
 });
