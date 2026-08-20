@@ -12,7 +12,10 @@
   export let data;
 
   $: years = Object.keys(data.filmsByYear).reverse();
-  let selectedYear = "2025";
+  // Default to the newest year the server sent us rather than a hardcoded
+  // one, so a year appearing on its October 1 becomes the landing view.
+  let pickedYear: string | null = null;
+  $: selectedYear = pickedYear ?? years[0];
   $: films = data.filmsByYear[selectedYear] ?? [];
   $: watchedForYear = (data.watched?.[selectedYear] ?? []) as string[];
   $: filterOptions = collectFilterOptions(films);
@@ -70,7 +73,7 @@
         class="cursor-pointer font-display"
         class:text-green={selectedYear === year}
         class:underline={selectedYear === year}
-        on:click={() => (selectedYear = year)}
+        on:click={() => (pickedYear = year)}
         >{year}
       </button>
     </li>

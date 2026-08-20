@@ -1,5 +1,7 @@
 import type { Actions } from './$types'
 import type { WatchedFilms } from '../database.types'
+import { dev } from '$app/environment'
+import { visibleYearsOnly } from '$lib/yearVisibility'
 
 export type FilmEntry = {
     id: number
@@ -16,8 +18,9 @@ export type FilmEntry = {
     }[]
 }
 
-export async function load({ locals: { supabase, safeGetSession } }) {
+export async function load({ locals: { supabase, safeGetSession }, parent }) {
     const { user } = await safeGetSession()
+    const { isAdmin } = await parent()
 
     const { data: filmRows } = await supabase
         .from('films')
@@ -38,8 +41,15 @@ export async function load({ locals: { supabase, safeGetSession } }) {
         })
     }
 
+    // Years that haven't reached their October 1 yet are still scraper
+    // placeholders, so the public never sees them. Admins do, and so does
+    // anyone running locally — same dev bypass as `requireAdmin`, so the
+    // next year's list can be worked on without an is_admin profile.
+    // The filter runs server-side so a hidden year never reaches the browser.
+    const visibleFilmsByYear = visibleYearsOnly(filmsByYear, isAdmin || dev)
+
     if (!user) {
-        return { watched: {} as WatchedFilms, filmsByYear }
+        return { watched: {} as WatchedFilms, filmsByYear: visibleFilmsByYear }
     }
 
     const { data } = await supabase
@@ -48,7 +58,10 @@ export async function load({ locals: { supabase, safeGetSession } }) {
         .eq('user_id', user.id)
         .maybeSingle()
 
-    return { watched: (data as { watched: WatchedFilms } | null)?.watched ?? {}, filmsByYear }
+    return {
+        watched: (data as { watched: WatchedFilms } | null)?.watched ?? {},
+        filmsByYear: visibleFilmsByYear
+    }
 }
 
 export const actions: Actions = {
