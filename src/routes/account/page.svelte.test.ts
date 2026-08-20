@@ -150,6 +150,20 @@ describe("account data listing", () => {
     expect(screen.getByText("no longer on the list")).toBeInTheDocument();
   });
 
+  it("labels a dateless film as a bonus pick, not as missing", () => {
+    renderPage({
+      years: ["2024"],
+      watchedByYear: {
+        "2024": [{ title: "Terrifier 3", date: "" }],
+      },
+      totalWatched: 1,
+    });
+
+    expect(screen.getByText(/Bonus/)).toBeInTheDocument();
+    expect(screen.getByText(/Terrifier 3/)).toBeInTheDocument();
+    expect(screen.queryByText("no longer on the list")).not.toBeInTheDocument();
+  });
+
   it("says so when nothing has been watched yet", () => {
     renderPage();
 

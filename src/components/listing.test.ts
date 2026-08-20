@@ -22,6 +22,20 @@ afterEach(() => {
   cleanup();
 });
 
+describe("film date", () => {
+  it("shows the date when the film has one", () => {
+    render(Listing, { ...baseProps, service: [] });
+
+    expect(screen.getByText("10/1/2025")).toBeInTheDocument();
+  });
+
+  it("shows Bonus for a film with no date (the 32nd film in a 31-day list)", () => {
+    render(Listing, { ...baseProps, service: [], date: "" });
+
+    expect(screen.getByText("Bonus")).toBeInTheDocument();
+  });
+});
+
 describe("watched checkbox", () => {
   it("renders an inert, unchecked checkbox when watched is undefined (logged out)", () => {
     render(Listing, { ...baseProps, service: [], watched: undefined });

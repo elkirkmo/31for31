@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import Button from "../../components/button.svelte";
+  import { displayFilmDate } from "$lib/filmDate";
 
   export let data;
   export let form;
@@ -102,9 +103,9 @@
             class="flex items-center justify-between py-1 border-b border-white/10"
           >
             <span>
-              {#if film.date}{film.date} — {/if}{film.title}
+              {#if film.date !== null}{displayFilmDate(film.date)} — {/if}{film.title}
             </span>
-            {#if !film.date}
+            {#if film.date === null}
               <span class="text-sm opacity-70">no longer on the list</span>
             {/if}
           </li>
