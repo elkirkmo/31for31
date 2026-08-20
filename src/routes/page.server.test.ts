@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { actions, load } from "./+page.server";
 import type { WatchedFilms } from "../database.types";
 
@@ -198,6 +198,7 @@ describe("root page load", () => {
 
     const result = await load({
       locals: { supabase, safeGetSession },
+      parent: async () => ({ isAdmin: false }),
     } as unknown as Parameters<typeof load>[0]);
 
     expect(result.filmsByYear).toEqual({
@@ -241,9 +242,74 @@ describe("root page load", () => {
 
     const result = await load({
       locals: { supabase, safeGetSession },
+      parent: async () => ({ isAdmin: false }),
     } as unknown as Parameters<typeof load>[0]);
 
     expect(result.watched).toEqual({ "2025": ["Film A"] });
     expect(result.filmsByYear).toEqual({});
+  });
+
+  // These exercise the release-date gate, so they pin `dev` explicitly
+  // rather than inheriting whatever vitest's environment reports.
+  describe("unreleased years", () => {
+    beforeEach(() => {
+      vi.resetModules();
+    });
+
+    const unreleasedFilmRows = [
+      {
+        id: 1,
+        year: 2025,
+        date: "10/1/2025",
+        title: "Film A",
+        justwatch_url: null,
+        services: [],
+      },
+      {
+        id: 2,
+        year: 9999,
+        date: "",
+        title: "Placeholder Film 1",
+        justwatch_url: null,
+        services: [],
+      },
+    ];
+
+    async function loadWith({
+      isAdmin,
+      devMode,
+    }: {
+      isAdmin: boolean;
+      devMode: boolean;
+    }) {
+      vi.doMock("$app/environment", () => ({ dev: devMode }));
+      const { load: freshLoad } = await import("./+page.server");
+
+      return freshLoad({
+        locals: {
+          supabase: fakeSupabaseForLoad({ filmRows: unreleasedFilmRows }),
+          safeGetSession: vi.fn(async () => ({ user: null })),
+        },
+        parent: async () => ({ isAdmin }),
+      } as unknown as Parameters<typeof load>[0]);
+    }
+
+    it("hides a year that has not reached its October 1 from non-admins", async () => {
+      const result = await loadWith({ isAdmin: false, devMode: false });
+
+      expect(Object.keys(result.filmsByYear)).toEqual(["2025"]);
+    });
+
+    it("keeps the unreleased year for an admin", async () => {
+      const result = await loadWith({ isAdmin: true, devMode: false });
+
+      expect(Object.keys(result.filmsByYear)).toEqual(["2025", "9999"]);
+    });
+
+    it("keeps the unreleased year in dev without an admin profile", async () => {
+      const result = await loadWith({ isAdmin: false, devMode: true });
+
+      expect(Object.keys(result.filmsByYear)).toEqual(["2025", "9999"]);
+    });
   });
 });
