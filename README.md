@@ -13,17 +13,23 @@ npm run dev
 npm run dev -- --open
 ```
 
+`npm run dev` also starts the local Supabase stack if it isn't already up — see "Development" below for the full local setup, which you'll need to do once before this works.
+
 ## Development
 
 Development runs against a local Supabase stack (Postgres, Auth, PostgREST) in Docker — not the production database. Requires [Docker](https://www.docker.com/) running locally.
 
 1. Copy `.env.example` to `.env.local`.
-2. `npm run db:start` — starts the local stack (first run pulls Docker images, takes a minute). Prints an API URL and anon/service_role keys; paste those into `.env.local` as `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY`.
+2. `npm run db:start` — starts the local stack (first run pulls Docker images, takes a minute). Prints an API URL and anon/service_role keys; paste those into `.env.local` as `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY`. You only need to run this by hand for the initial key-copying step — from then on `npm run dev` starts the stack for you (see below).
 3. `npm run db:reset` — applies every migration in `supabase/migrations/` to a fresh local database and runs `supabase/seed.sql`, which seeds a ready-to-go local admin account (`dev@example.com` / `devpassword` by default — set `DEV_LOGIN_EMAIL` / `DEV_LOGIN_PASSWORD` in `.env.local` to match, or edit the seed to use different ones).
 4. `npm run migrate:data` — imports `src/data.json`'s films/services into the local database (the same script originally used to migrate production; it just acts on whatever `.env.local` currently points at).
 5. `npm run dev`, then use the **Dev login** button on `/login`. Signs in as the seeded user — `/admin` works immediately, since that user is pre-bootstrapped as admin by the seed. No manual dashboard steps for local dev.
 
 `npm run db:stop` shuts the stack down. `npm run db:reset` is safe to run anytime you want a clean slate — this is a fully disposable local database.
+
+**`npm run dev` starts the local stack for you.** It runs `scripts/dev-supabase.mjs` first, which brings Supabase up if it isn't already running, and is a no-op when it is. This exists because a stopped stack doesn't fail loudly — the app boots fine and then misbehaves in ways that don't point at the cause (films silently missing from the list, the dev login erroring). If Docker itself isn't running it says so and tells you to start it, rather than surfacing a Docker socket error.
+
+Use `npm run dev:app` to skip that check and run Vite alone — the right choice when `.env.local` points at a real Supabase project rather than the local stack. (The check skips itself automatically in that case anyway, since there'd be no local stack to start.)
 
 **Schema changes**: `npx supabase migration new <name>`, edit the generated file, `npm run db:reset` to verify it applies cleanly, then `npx supabase db push` to ship it to production once you're confident (one-time setup: `npx supabase login && npx supabase link --project-ref <ref>`). This replaces pasting SQL directly into the production dashboard.
 
