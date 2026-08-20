@@ -7,6 +7,7 @@
   import { onMount } from "svelte";
   import Listing from "../components/listing.svelte";
   import Filter from "../components/filter.svelte";
+  import ProgressBar from "../components/progressBar.svelte";
   import siteData from "../data.json";
   import { collectFilterOptions } from "$lib/services";
   import { readStoredYear, storeYear } from "$lib/yearPreference";
@@ -20,6 +21,12 @@
   $: selectedYear = pickedYear ?? years[0];
   $: films = data.filmsByYear[selectedYear] ?? [];
   $: watchedForYear = (data.watched?.[selectedYear] ?? []) as string[];
+  // Counted against this year's films rather than off watchedForYear.length:
+  // progress can hold titles that have since been renamed or dropped, which
+  // would otherwise push the count past the total.
+  $: watchedCount = films.filter((film) =>
+    watchedForYear.includes(film.title),
+  ).length;
   $: filterOptions = collectFilterOptions(films);
   let selectedServices: Set<string> | undefined = undefined;
   let selectedPrices: Set<string> | undefined = undefined;
@@ -93,6 +100,13 @@
     </li>
   {/each}
 </ul>
+
+<!-- Only worth showing once there's progress to show: logged-out readers
+     have none, and a logged-in reader who hasn't ticked anything this year
+     would just get an empty bar. -->
+{#if data.session && watchedCount > 0}
+  <ProgressBar watched={watchedCount} total={films.length} year={selectedYear} />
+{/if}
 
 {#key selectedYear}
   <Filter
