@@ -4,10 +4,12 @@
 
   inject({ mode: dev ? "development" : "production" });
 
+  import { onMount } from "svelte";
   import Listing from "../components/listing.svelte";
   import Filter from "../components/filter.svelte";
   import siteData from "../data.json";
   import { collectFilterOptions } from "$lib/services";
+  import { readStoredYear, storeYear } from "$lib/yearPreference";
 
   export let data;
 
@@ -21,6 +23,18 @@
   $: filterOptions = collectFilterOptions(films);
   let selectedServices: Set<string> | undefined = undefined;
   let selectedPrices: Set<string> | undefined = undefined;
+
+  // Restored after mount, not during init: the server has no localStorage,
+  // so reading it earlier would render one year server-side and a different
+  // one on hydration.
+  onMount(() => {
+    pickedYear = readStoredYear(years);
+  });
+
+  function pickYear(year: string) {
+    pickedYear = year;
+    storeYear(year);
+  }
 
   const {
     heading,
@@ -73,7 +87,7 @@
         class="cursor-pointer font-display"
         class:text-green={selectedYear === year}
         class:underline={selectedYear === year}
-        on:click={() => (pickedYear = year)}
+        on:click={() => pickYear(year)}
         >{year}
       </button>
     </li>
