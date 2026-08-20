@@ -8,13 +8,16 @@
 </script>
 
 {#if total > 0}
-  <div class="mb-7 font-display">
+  <!-- 80% wide and centred. Sized against the layout's max-w-3xl column
+       rather than the raw viewport: 80vw on a desktop screen would run well
+       past the container and push the page sideways. -->
+  <div class="mb-7 font-display w-4/5 mx-auto">
     <div class="flex justify-between items-baseline mb-1">
       <span>{watched} of {total} watched</span>
       <span class="text-green">{percent}%</span>
     </div>
     <div
-      class="h-3 w-full border-2 border-green"
+      class="h-3 w-full border-2 border-green rounded-full overflow-hidden"
       role="progressbar"
       aria-label={label}
       aria-valuemin={0}
@@ -25,7 +28,7 @@
       <!-- Inline width because the value is arbitrary; Tailwind can only
            generate classes it can see at build time. -->
       <div
-        class="h-full bg-green transition-[width] duration-300"
+        class="h-full bg-green rounded-full transition-[width] duration-300"
         style:width="{percent}%"
       ></div>
     </div>
