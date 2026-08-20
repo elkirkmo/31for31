@@ -8,10 +8,10 @@
 </script>
 
 {#if total > 0}
-  <!-- 80% wide and centred. Sized against the layout's max-w-3xl column
-       rather than the raw viewport: 80vw on a desktop screen would run well
+  <!-- 60% wide and centred. Sized against the layout's max-w-3xl column
+       rather than the raw viewport: 60vw on a desktop screen would still run
        past the container and push the page sideways. -->
-  <div class="mb-7 font-display w-4/5 mx-auto">
+  <div class="mb-7 font-display w-3/5 mx-auto">
     <div class="flex justify-between items-baseline mb-1">
       <span>{watched} of {total} watched</span>
       <span class="text-green">{percent}%</span>
