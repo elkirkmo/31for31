@@ -27,9 +27,11 @@ const filmsByYear = {
 //
 // Awaits a tick because the stored year is restored in onMount, so the tab
 // it selects only reaches the DOM on the following update.
-async function renderPage() {
+async function renderPage(
+  overrides: { watched?: Record<string, string[]>; session?: unknown } = {},
+) {
   const result = render(HomePage, {
-    data: { filmsByYear, watched: {}, session: null },
+    data: { filmsByYear, watched: {}, session: null, ...overrides },
   } as never);
   await tick();
   return result;
@@ -79,5 +81,46 @@ describe("year selection", () => {
     await renderPage();
 
     expect(selectedTab()).toBe("2025");
+  });
+});
+
+describe("progress bar", () => {
+  it("is hidden when nobody is logged in", async () => {
+    await renderPage();
+
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("counts the logged-in reader's watched films for the selected year", async () => {
+    await renderPage({
+      session: { user: { id: "user-1" } },
+      watched: { "2025": ["Film 2025"] },
+    });
+
+    expect(screen.getByText("1 of 1 watched")).toBeInTheDocument();
+  });
+
+  it("ignores watched titles that are not in the year's film list", async () => {
+    // A title renamed since it was ticked would otherwise count towards the
+    // total and could push the bar past 100%.
+    await renderPage({
+      session: { user: { id: "user-1" } },
+      watched: { "2025": ["Film 2025", "Renamed Since"] },
+    });
+
+    expect(screen.getByText("1 of 1 watched")).toBeInTheDocument();
+  });
+
+  it("recounts when the reader switches year", async () => {
+    await renderPage({
+      session: { user: { id: "user-1" } },
+      watched: { "2025": ["Film 2025"] },
+    });
+
+    expect(screen.getByText("1 of 1 watched")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "2024" }));
+
+    expect(screen.getByText("0 of 1 watched")).toBeInTheDocument();
   });
 });
