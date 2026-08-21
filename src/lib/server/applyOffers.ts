@@ -24,11 +24,17 @@ function sanitizeUrl(value: string | null): string | null {
 // Replaces a film's stored offers wholesale with a freshly scraped list.
 // Shared by the batch refresh flow (/admin/refresh) and the per-film
 // "Rescrape this film" action on /admin/films/[id].
+//
+// An empty offer list is a legitimate state -- a few films genuinely stream
+// nowhere -- so this applies it. The check that a whole scrape hasn't come
+// back empty belongs to the caller, which can see the run as a whole; see
+// the applyAll action in admin/refresh.
 export async function applyFilmOffers(filmId: number, offers: ScraperOffer[]): Promise<ApplyResult> {
-    const { error: deleteError } = await supabaseAdmin.from('services').delete().eq('film_id', filmId)
-    if (deleteError) return { ok: false, error: deleteError.message }
-
-    if (offers.length === 0) return { ok: true }
+    const { data: existing, error: readError } = await supabaseAdmin
+        .from('services')
+        .select('id')
+        .eq('film_id', filmId)
+    if (readError) return { ok: false, error: readError.message }
 
     const rows = offers.map((o) => ({
         film_id: filmId,
@@ -40,8 +46,22 @@ export async function applyFilmOffers(filmId: number, offers: ScraperOffer[]): P
         icon: sanitizeUrl(o.icon)
     }))
 
-    const { error: insertError } = await supabaseAdmin.from('services').insert(rows)
-    if (insertError) return { ok: false, error: insertError.message }
+    // PostgREST gives us no transaction, so the two writes are ordered by
+    // which failure we can live with. Inserting first means the bad case is a
+    // few seconds of duplicated offers on the page; deleting first means the
+    // bad case is a film showing nowhere to watch it.
+    if (rows.length > 0) {
+        const { error: insertError } = await supabaseAdmin.from('services').insert(rows)
+        if (insertError) return { ok: false, error: insertError.message }
+    }
+
+    const staleIds = (existing ?? []).map((row) => row.id)
+    if (staleIds.length > 0) {
+        const { error: deleteError } = await supabaseAdmin.from('services').delete().in('id', staleIds)
+        if (deleteError) {
+            return { ok: false, error: `new offers saved but the old ones are still there: ${deleteError.message}` }
+        }
+    }
 
     return { ok: true }
 }

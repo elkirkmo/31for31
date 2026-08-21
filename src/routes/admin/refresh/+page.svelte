@@ -33,6 +33,25 @@
 
 {#if form?.appliedAll !== undefined}
   <p class="text-green mb-4">Applied {form.appliedAll} film(s).</p>
+  <!-- A film losing every offer is the one change worth reading, so it gets
+       its own block rather than being absorbed into the applied count. -->
+  {#if form.cleared?.length}
+    <div class="mb-4">
+      <p class="text-sm">
+        {form.cleared.length} film(s) now have no streaming services at all:
+      </p>
+      <ul class="text-sm mb-2">
+        {#each form.cleared as name}
+          <li>{name}</li>
+        {/each}
+      </ul>
+      <p class="text-sm opacity-70">
+        A few films really do stream nowhere. If one of these shouldn't, rescrape
+        it from its edit page — an offer list can come back empty because a page
+        moved, not because the film left every service.
+      </p>
+    </div>
+  {/if}
   {#if form.errors?.length}
     <ul class="text-red-400 text-sm mb-4">
       {#each form.errors as err}

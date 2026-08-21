@@ -106,8 +106,8 @@ export const actions: Actions = {
         const films = await loadFilmsWithServices()
         const filmsByKey = new Map(films.map((f) => [filmKey(f.year, f.title), f]))
 
-        let appliedCount = 0
         const errors: string[] = []
+        const matched: { film: FilmRow; entry: { title: string; service: ScraperOffer[] } }[] = []
 
         for (const [year, entries] of Object.entries(scrapeResult.data)) {
             if (!Array.isArray(entries)) continue
@@ -118,13 +118,38 @@ export const actions: Actions = {
                     errors.push(`${entry.title}: ${entry.error}`)
                     continue
                 }
-
-                const applyResult = await applyFilmOffers(film.id, entry.service)
-                if (!applyResult.ok) errors.push(`${entry.title}: ${applyResult.error}`)
-                else appliedCount++
+                matched.push({ film, entry })
             }
         }
 
-        return { appliedAll: appliedCount, errors }
+        // A film here and there genuinely streams nowhere. Every film
+        // streaming nowhere is a broken scrape, not a catalogue that emptied
+        // overnight — and applying it would erase the one thing the site is
+        // for. Refuse the whole run rather than write a single row.
+        const withOffers = matched.filter(({ entry }) => entry.service.length > 0)
+        if (matched.length > 0 && withOffers.length === 0) {
+            return {
+                error: `Refused: the scrape found no streaming offers for any of the ${matched.length} matched films, which means the scrape failed rather than every film leaving every service. Nothing was changed.`
+            }
+        }
+
+        let appliedCount = 0
+        // Films that had offers and now have none. Legitimate one at a time,
+        // worth an admin's eyes rather than passing silently inside a count.
+        const cleared: string[] = []
+
+        for (const { film, entry } of matched) {
+            const applyResult = await applyFilmOffers(film.id, entry.service)
+            if (!applyResult.ok) {
+                errors.push(`${entry.title}: ${applyResult.error}`)
+                continue
+            }
+            appliedCount++
+            if (entry.service.length === 0 && film.services.length > 0) {
+                cleared.push(`${entry.title} — ${film.services.length} offer(s) removed, now streaming nowhere`)
+            }
+        }
+
+        return { appliedAll: appliedCount, errors, cleared }
     }
 }
