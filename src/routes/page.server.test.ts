@@ -132,9 +132,13 @@ describe("toggleWatched action", () => {
 function fakeSupabaseForLoad({
   filmRows = [] as Record<string, unknown>[],
   watched = null as WatchedFilms | null,
+  filmsError = null as { message: string } | null,
+  progressError = null as { message: string } | null,
 }: {
   filmRows?: Record<string, unknown>[];
   watched?: WatchedFilms | null;
+  filmsError?: { message: string } | null;
+  progressError?: { message: string } | null;
 } = {}) {
   return {
     from: vi.fn((table: string) => {
@@ -142,7 +146,10 @@ function fakeSupabaseForLoad({
         return {
           select: vi.fn(() => ({
             order: vi.fn(() => ({
-              order: vi.fn(async () => ({ data: filmRows })),
+              order: vi.fn(async () => ({
+                data: filmsError ? null : filmRows,
+                error: filmsError,
+              })),
             })),
           })),
         };
@@ -153,6 +160,7 @@ function fakeSupabaseForLoad({
             eq: vi.fn(() => ({
               maybeSingle: vi.fn(async () => ({
                 data: watched ? { watched } : null,
+                error: progressError,
               })),
             })),
           })),
@@ -233,6 +241,52 @@ describe("root page load", () => {
     expect(result.watched).toEqual({});
   });
 
+  it("fails loudly instead of rendering an empty list when the films read breaks", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const supabase = fakeSupabaseForLoad({
+      filmsError: { message: "permission denied for table films" },
+    });
+    const safeGetSession = vi.fn(async () => ({ user: null }));
+
+    await expect(
+      load({
+        locals: { supabase, safeGetSession },
+        parent: async () => ({ isAdmin: false }),
+      } as unknown as Parameters<typeof load>[0]),
+    ).rejects.toMatchObject({ status: 500 });
+
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("still serves the films when only the progress read breaks", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const supabase = fakeSupabaseForLoad({
+      filmRows: [
+        {
+          id: 1,
+          year: 2025,
+          date: "10/1/2025",
+          title: "Film A",
+          justwatch_url: null,
+          services: [],
+        },
+      ],
+      progressError: { message: "connection reset" },
+    });
+    const safeGetSession = vi.fn(async () => ({ user: { id: "user-1" } }));
+
+    const result = await load({
+      locals: { supabase, safeGetSession },
+      parent: async () => ({ isAdmin: false }),
+    } as unknown as Parameters<typeof load>[0]);
+
+    expect(Object.keys(result.filmsByYear)).toEqual(["2025"]);
+    expect(result.watched).toEqual({});
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   it("returns watched progress for the logged-in user alongside filmsByYear", async () => {
     const supabase = fakeSupabaseForLoad({
       filmRows: [],
@@ -304,6 +358,27 @@ describe("root page load", () => {
       const result = await loadWith({ isAdmin: true, devMode: false });
 
       expect(Object.keys(result.filmsByYear)).toEqual(["2025", "9999"]);
+    });
+
+    it("still lands an admin on the newest public year, not the unreleased one", async () => {
+      const result = await loadWith({ isAdmin: true, devMode: false });
+
+      expect(result.defaultYear).toBe("2025");
+      expect(result.unreleasedYears).toEqual(["9999"]);
+    });
+
+    it("lands on the newest public year in dev too", async () => {
+      const result = await loadWith({ isAdmin: false, devMode: true });
+
+      expect(result.defaultYear).toBe("2025");
+      expect(result.unreleasedYears).toEqual(["9999"]);
+    });
+
+    it("flags nothing as unreleased for the public", async () => {
+      const result = await loadWith({ isAdmin: false, devMode: false });
+
+      expect(result.defaultYear).toBe("2025");
+      expect(result.unreleasedYears).toEqual([]);
     });
 
     it("keeps the unreleased year in dev without an admin profile", async () => {
