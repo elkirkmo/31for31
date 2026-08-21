@@ -40,25 +40,18 @@ describe('applyFilmOffers', () => {
         fromMock.mockReset()
     })
 
-    describe('never leaving a film with nowhere to watch it', () => {
-        it('refuses an empty scrape instead of wiping the existing offers', async () => {
-            const { insert, deleteIn } = fakeSupabase()
+    describe('write ordering', () => {
+        // A handful of films genuinely stream nowhere, so clearing one is a
+        // legitimate outcome here. Refusing a whole scrape that came back
+        // empty for everything is the caller's job -- see the applyAll action.
+        it('clears the offers when the scrape legitimately found none', async () => {
+            const { insert, deleteIn } = fakeSupabase({ existingIds: [7, 8] })
 
             const result = await applyFilmOffers(1, [])
 
-            expect(result.ok).toBe(false)
+            expect(result).toEqual({ ok: true })
             expect(insert).not.toHaveBeenCalled()
-            expect(deleteIn).not.toHaveBeenCalled()
-        })
-
-        it('explains why an empty scrape was refused', async () => {
-            fakeSupabase()
-
-            const result = await applyFilmOffers(1, [])
-
-            expect(result).toMatchObject({
-                error: expect.stringContaining('no offers')
-            })
+            expect(deleteIn).toHaveBeenCalledWith('id', [7, 8])
         })
 
         it('leaves the old offers in place when the insert fails', async () => {

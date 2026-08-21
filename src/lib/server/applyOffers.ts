@@ -25,23 +25,11 @@ function sanitizeUrl(value: string | null): string | null {
 // Shared by the batch refresh flow (/admin/refresh) and the per-film
 // "Rescrape this film" action on /admin/films/[id].
 //
-// Telling people where to watch a film is the entire point of the site, so
-// this function is deliberately biased against ending up with none. Two
-// rules follow from that, both learned the hard way -- Bride of Frankenstein
-// went from seven offers to zero in production and reported success:
-//
-//  1. An empty scrape is never applied. It is far more often a moved page or
-//     a transient scrape failure than a film genuinely leaving every service.
-//  2. New rows go in before old ones come out, so a failed insert leaves the
-//     film with the offers it already had rather than with nothing.
+// An empty offer list is a legitimate state -- a few films genuinely stream
+// nowhere -- so this applies it. The check that a whole scrape hasn't come
+// back empty belongs to the caller, which can see the run as a whole; see
+// the applyAll action in admin/refresh.
 export async function applyFilmOffers(filmId: number, offers: ScraperOffer[]): Promise<ApplyResult> {
-    if (offers.length === 0) {
-        return {
-            ok: false,
-            error: 'scraper returned no offers — kept the existing ones. Clear them by hand if the film really has left every service.'
-        }
-    }
-
     const { data: existing, error: readError } = await supabaseAdmin
         .from('services')
         .select('id')
@@ -59,11 +47,13 @@ export async function applyFilmOffers(filmId: number, offers: ScraperOffer[]): P
     }))
 
     // PostgREST gives us no transaction, so the two writes are ordered by
-    // which failure we can live with. This way the bad case is a few seconds
-    // of duplicated offers on the page; the other order's bad case is a film
-    // showing nowhere to watch it.
-    const { error: insertError } = await supabaseAdmin.from('services').insert(rows)
-    if (insertError) return { ok: false, error: insertError.message }
+    // which failure we can live with. Inserting first means the bad case is a
+    // few seconds of duplicated offers on the page; deleting first means the
+    // bad case is a film showing nowhere to watch it.
+    if (rows.length > 0) {
+        const { error: insertError } = await supabaseAdmin.from('services').insert(rows)
+        if (insertError) return { ok: false, error: insertError.message }
+    }
 
     const staleIds = (existing ?? []).map((row) => row.id)
     if (staleIds.length > 0) {

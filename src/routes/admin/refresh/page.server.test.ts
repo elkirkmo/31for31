@@ -169,6 +169,108 @@ describe('admin refresh applyAll action', () => {
 
         expect(applyFilmOffersMock).toHaveBeenCalledTimes(1)
         expect(applyFilmOffersMock).toHaveBeenCalledWith(1, [offer('Tubi')])
-        expect(result).toEqual({ appliedAll: 1, errors: ['Film B: timed out'] })
+        expect(result).toEqual({ appliedAll: 1, errors: ['Film B: timed out'], cleared: [] })
+    })
+
+    // The rule: a couple of films streaming nowhere is normal, every film
+    // streaming nowhere is a broken scrape.
+    it('refuses the whole run when the scrape found offers for nothing', async () => {
+        scrapeAllMock.mockResolvedValue({
+            ok: true,
+            data: {
+                '2025': [
+                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [] },
+                    { id: 202502, title: 'Film B', date: '10/2/2025', service: [] }
+                ]
+            }
+        })
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2025, title: 'Film A', services: [offer('Tubi')] },
+                { id: 2, year: 2025, title: 'Film B', services: [offer('Netflix')] }
+            ])
+        )
+
+        const result = await actions.applyAll({ locals: {} } as unknown as Parameters<typeof actions.applyAll>[0])
+
+        expect(applyFilmOffersMock).not.toHaveBeenCalled()
+        expect(result).toMatchObject({ error: expect.stringContaining('no streaming offers for any') })
+    })
+
+    it('proceeds when even one film still has offers', async () => {
+        scrapeAllMock.mockResolvedValue({
+            ok: true,
+            data: {
+                '2025': [
+                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [offer('Tubi')] },
+                    { id: 202502, title: 'Film B', date: '10/2/2025', service: [] }
+                ]
+            }
+        })
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2025, title: 'Film A', services: [] },
+                { id: 2, year: 2025, title: 'Film B', services: [offer('Netflix')] }
+            ])
+        )
+        applyFilmOffersMock.mockResolvedValue({ ok: true })
+
+        const result = await actions.applyAll({ locals: {} } as unknown as Parameters<typeof actions.applyAll>[0])
+
+        expect(applyFilmOffersMock).toHaveBeenCalledTimes(2)
+        expect(result).toMatchObject({ appliedAll: 2 })
+    })
+
+    it('names the films that went from having offers to having none', async () => {
+        scrapeAllMock.mockResolvedValue({
+            ok: true,
+            data: {
+                '2025': [
+                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [offer('Tubi')] },
+                    { id: 202502, title: 'Bride of Frankenstein', date: '10/2/2025', service: [] }
+                ]
+            }
+        })
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2025, title: 'Film A', services: [] },
+                {
+                    id: 2,
+                    year: 2025,
+                    title: 'Bride of Frankenstein',
+                    services: [offer('Netflix'), offer('Tubi')]
+                }
+            ])
+        )
+        applyFilmOffersMock.mockResolvedValue({ ok: true })
+
+        const result = await actions.applyAll({ locals: {} } as unknown as Parameters<typeof actions.applyAll>[0])
+
+        expect(result).toMatchObject({
+            cleared: ['Bride of Frankenstein — 2 offer(s) removed, now streaming nowhere']
+        })
+    })
+
+    it('does not flag a film that already had no offers', async () => {
+        scrapeAllMock.mockResolvedValue({
+            ok: true,
+            data: {
+                '2025': [
+                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [offer('Tubi')] },
+                    { id: 202502, title: 'Thanksgiving', date: '10/2/2025', service: [] }
+                ]
+            }
+        })
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2025, title: 'Film A', services: [] },
+                { id: 2, year: 2025, title: 'Thanksgiving', services: [] }
+            ])
+        )
+        applyFilmOffersMock.mockResolvedValue({ ok: true })
+
+        const result = await actions.applyAll({ locals: {} } as unknown as Parameters<typeof actions.applyAll>[0])
+
+        expect(result).toMatchObject({ cleared: [] })
     })
 })
