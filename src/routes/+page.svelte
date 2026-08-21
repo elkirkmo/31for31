@@ -15,10 +15,11 @@
   export let data;
 
   $: years = Object.keys(data.filmsByYear).reverse();
-  // Default to the newest year the server sent us rather than a hardcoded
-  // one, so a year appearing on its October 1 becomes the landing view.
+  // The server picks the landing year: the newest one the public can see. An
+  // admin can still click through to an unreleased year, but doesn't open on
+  // a page of placeholders.
   let pickedYear: string | null = null;
-  $: selectedYear = pickedYear ?? years[0];
+  $: selectedYear = pickedYear ?? data.defaultYear ?? years[0];
   $: films = data.filmsByYear[selectedYear] ?? [];
   $: watchedForYear = (data.watched?.[selectedYear] ?? []) as string[];
   // Counted against this year's films rather than off watchedForYear.length:
@@ -95,7 +96,9 @@
         class:text-green={selectedYear === year}
         class:underline={selectedYear === year}
         on:click={() => pickYear(year)}
-        >{year}
+        >{year}{#if data.unreleasedYears?.includes(year)}
+          <span class="text-xs opacity-70"> (unreleased)</span>
+        {/if}
       </button>
     </li>
   {/each}

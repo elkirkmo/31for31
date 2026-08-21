@@ -360,6 +360,27 @@ describe("root page load", () => {
       expect(Object.keys(result.filmsByYear)).toEqual(["2025", "9999"]);
     });
 
+    it("still lands an admin on the newest public year, not the unreleased one", async () => {
+      const result = await loadWith({ isAdmin: true, devMode: false });
+
+      expect(result.defaultYear).toBe("2025");
+      expect(result.unreleasedYears).toEqual(["9999"]);
+    });
+
+    it("lands on the newest public year in dev too", async () => {
+      const result = await loadWith({ isAdmin: false, devMode: true });
+
+      expect(result.defaultYear).toBe("2025");
+      expect(result.unreleasedYears).toEqual(["9999"]);
+    });
+
+    it("flags nothing as unreleased for the public", async () => {
+      const result = await loadWith({ isAdmin: false, devMode: false });
+
+      expect(result.defaultYear).toBe("2025");
+      expect(result.unreleasedYears).toEqual([]);
+    });
+
     it("keeps the unreleased year in dev without an admin profile", async () => {
       const result = await loadWith({ isAdmin: false, devMode: true });
 
