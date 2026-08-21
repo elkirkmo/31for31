@@ -46,12 +46,19 @@ export const handle: Handle = async ({ event, resolve }) => {
             data: { user },
             error,
         } = await event.locals.supabase.auth.getUser()
-        if (error) {
-            // JWT validation has failed
+        if (error || !user) {
+            // JWT validation has failed, or the token is valid but resolves to
+            // no user. Either way there is nobody authenticated here.
             return { session: null, user: null }
         }
 
-        return { session, user }
+        // The session from getSession() carries a `user` read straight out of
+        // the cookie, which supabase-js wraps in a proxy that warns the moment
+        // any of its properties are read — and SvelteKit reads all of them when
+        // it serializes layout data for the client. Swap in the `user` that
+        // getUser() just authenticated, so anything reading `session.user`
+        // downstream gets the verified one rather than the cookie's claim.
+        return { session: { ...session, user }, user }
     }
 
     return resolve(event, {
