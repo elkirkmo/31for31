@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
+  import SubmitForm from "../../../components/submitForm.svelte";
   export let form;
 </script>
 
@@ -42,9 +43,12 @@
 {/if}
 
 {#if form?.preview}
-  <form method="POST" action="?/applyAll" use:enhance class="mb-4">
-    <button type="submit" class="text-sm text-green underline">Apply all matched films</button>
-  </form>
+  <SubmitForm
+    action="?/applyAll"
+    label="Apply all matched films"
+    busyLabel="Applying all films…"
+    class="mb-4"
+  />
 
   {#if form.preview.length === 0}
     <p class="text-sm opacity-70 mb-4">No matched films to refresh.</p>
