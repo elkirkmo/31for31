@@ -36,10 +36,23 @@ const filmsByYear = {
 // Awaits a tick because the stored year is restored in onMount, so the tab
 // it selects only reaches the DOM on the following update.
 async function renderPage(
-  overrides: { watched?: Record<string, string[]>; session?: unknown } = {},
+  overrides: {
+    watched?: Record<string, string[]>;
+    session?: unknown;
+    filmsByYear?: Record<string, unknown[]>;
+    defaultYear?: string | null;
+    unreleasedYears?: string[];
+  } = {},
 ) {
   const result = render(HomePage, {
-    data: { filmsByYear, watched: {}, session: null, ...overrides },
+    data: {
+      filmsByYear,
+      watched: {},
+      session: null,
+      defaultYear: "2025",
+      unreleasedYears: [],
+      ...overrides,
+    },
   } as never);
   await tick();
   return result;
@@ -47,9 +60,11 @@ async function renderPage(
 
 // The selected year is the one whose tab button is underlined.
 function selectedTab() {
-  return ["2025", "2024"].find((year) =>
-    screen.getByRole("button", { name: year }).classList.contains("underline"),
-  );
+  return ["2026", "2025", "2024"]
+    .map((year) => screen.queryByRole("button", { name: new RegExp(`^${year}`) }))
+    .find((button) => button?.classList.contains("underline"))
+    ?.textContent?.trim()
+    .split(" ")[0];
 }
 
 beforeEach(() => {
@@ -165,5 +180,48 @@ describe("progress bar", () => {
 
     expect(screen.getByText("32 of 32 watched")).toBeInTheDocument();
     expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+});
+
+describe("unreleased years", () => {
+  // What an admin gets: 2026 exists and is clickable, but the page opens on
+  // the newest public year rather than a list of placeholders.
+  const withUnreleased = {
+    filmsByYear: {
+      ...filmsByYear,
+      "2026": yearOfFilms("2026", 7),
+    },
+    defaultYear: "2025",
+    unreleasedYears: ["2026"],
+  };
+
+  it("opens on the newest public year even when a newer one is visible", async () => {
+    await renderPage(withUnreleased);
+
+    expect(selectedTab()).toBe("2025");
+    expect(screen.getByText("Film 2025 #1")).toBeInTheDocument();
+    expect(screen.queryByText("Film 2026 #1")).not.toBeInTheDocument();
+  });
+
+  it("still offers the unreleased year as a tab, flagged as such", async () => {
+    await renderPage(withUnreleased);
+
+    const tab = screen.getByRole("button", { name: /2026/ });
+    expect(tab).toBeInTheDocument();
+    expect(tab).toHaveTextContent("unreleased");
+  });
+
+  it("shows the unreleased list once its tab is clicked", async () => {
+    await renderPage(withUnreleased);
+
+    await fireEvent.click(screen.getByRole("button", { name: /2026/ }));
+
+    expect(screen.getByText("Film 2026 #1")).toBeInTheDocument();
+  });
+
+  it("marks nothing as unreleased for the public", async () => {
+    await renderPage();
+
+    expect(screen.queryByText(/unreleased/)).not.toBeInTheDocument();
   });
 });

@@ -48,8 +48,29 @@ export async function load({ locals: { supabase, safeGetSession }, parent }) {
     // The filter runs server-side so a hidden year never reaches the browser.
     const visibleFilmsByYear = visibleYearsOnly(filmsByYear, isAdmin || dev)
 
+    // Being able to see an unreleased year is not the same as landing on it.
+    // Seeing it is for reviewing the list before it goes live; the front page
+    // should still open on what everyone else gets, or an admin arrives to a
+    // page of undated placeholders with no offers and reasonably concludes
+    // the site is broken.
+    const newest = (years: string[]) =>
+        years.sort((a, b) => Number(b) - Number(a))[0] ?? null
+
+    const publicYears = Object.keys(visibleYearsOnly(filmsByYear, false))
+    const defaultYear = newest(publicYears) ?? newest(Object.keys(visibleFilmsByYear))
+
+    // Flagged in the tab strip so it's obvious which years aren't public yet.
+    const unreleasedYears = Object.keys(visibleFilmsByYear).filter(
+        (year) => !publicYears.includes(year)
+    )
+
     if (!user) {
-        return { watched: {} as WatchedFilms, filmsByYear: visibleFilmsByYear }
+        return {
+            watched: {} as WatchedFilms,
+            filmsByYear: visibleFilmsByYear,
+            defaultYear,
+            unreleasedYears
+        }
     }
 
     const { data } = await supabase
@@ -60,7 +81,9 @@ export async function load({ locals: { supabase, safeGetSession }, parent }) {
 
     return {
         watched: (data as { watched: WatchedFilms } | null)?.watched ?? {},
-        filmsByYear: visibleFilmsByYear
+        filmsByYear: visibleFilmsByYear,
+        defaultYear,
+        unreleasedYears
     }
 }
 
