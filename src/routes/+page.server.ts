@@ -1,3 +1,4 @@
+import { error } from '@sveltejs/kit'
 import type { Actions } from './$types'
 import type { WatchedFilms } from '../database.types'
 import { dev } from '$app/environment'
@@ -22,11 +23,20 @@ export async function load({ locals: { supabase, safeGetSession }, parent }) {
     const { user } = await safeGetSession()
     const { isAdmin } = await parent()
 
-    const { data: filmRows } = await supabase
+    const { data: filmRows, error: filmsError } = await supabase
         .from('films')
         .select('id, year, date, title, justwatch_url, services(*)')
         .order('year')
         .order('sort_order')
+
+    // A failed read must not render as an empty list. The film list is the
+    // whole page, so "no films" and "the query broke" look identical to a
+    // visitor — and identical to us, which is how a production outage went
+    // undiagnosed. Log it so it reaches the platform logs, then fail loudly.
+    if (filmsError) {
+        console.error('films query failed:', filmsError)
+        throw error(500, "Couldn't load the films. Please try again.")
+    }
 
     const filmsByYear: Record<string, FilmEntry[]> = {}
     for (const row of (filmRows ?? []) as unknown as (FilmEntry & { year: number; services: FilmEntry['service'] })[]) {
@@ -52,11 +62,16 @@ export async function load({ locals: { supabase, safeGetSession }, parent }) {
         return { watched: {} as WatchedFilms, filmsByYear: visibleFilmsByYear }
     }
 
-    const { data } = await supabase
+    const { data, error: progressError } = await supabase
         .from('progress')
         .select('watched')
         .eq('user_id', user.id)
         .maybeSingle()
+
+    // Logged but not fatal, unlike the films read above: a missing progress
+    // row costs the reader their ticks and the progress bar, which is worth
+    // knowing about, but it isn't worth taking the whole list down for.
+    if (progressError) console.error('progress query failed:', progressError)
 
     return {
         watched: (data as { watched: WatchedFilms } | null)?.watched ?? {},
