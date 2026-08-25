@@ -28,8 +28,26 @@
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+  let container: HTMLDivElement;
+
   function toggleOpen() {
     open = !open;
+  }
+
+  // The Filter button lives inside `container`, so its own click is treated
+  // as inside and never closes what toggleOpen just opened -- the usual way
+  // this goes wrong. Guarded on `open` so a closed dropdown isn't doing
+  // containment checks on every click on the page.
+  function closeOnOutsideClick(event: MouseEvent) {
+    if (!open) return;
+    if (container?.contains(event.target as Node)) return;
+    open = false;
+  }
+
+  // A keyboard user can't "click outside", so Escape is the same gesture for
+  // them. Without it the dropdown is only dismissable with a mouse.
+  function closeOnEscape(event: KeyboardEvent) {
+    if (event.key === "Escape") open = false;
   }
 
   function toggleShowAllServices() {
@@ -55,7 +73,9 @@
   }
 </script>
 
-<div class="relative mb-6 flex justify-center">
+<svelte:window on:click={closeOnOutsideClick} on:keydown={closeOnEscape} />
+
+<div class="relative mb-6 flex justify-center" bind:this={container}>
   <Button emoji="🎃" text="Filter" aria-expanded={open} on:click={toggleOpen} />
 
   {#if open}

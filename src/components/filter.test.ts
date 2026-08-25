@@ -56,6 +56,60 @@ describe("dropdown toggle", () => {
   });
 });
 
+describe("dismissing the dropdown", () => {
+  it("closes when a click lands outside the component", async () => {
+    await openFilter();
+    expect(screen.getByText("Services")).toBeInTheDocument();
+
+    await fireEvent.click(document.body);
+
+    expect(screen.queryByText("Services")).not.toBeInTheDocument();
+  });
+
+  it("stays open when a click lands inside the dropdown", async () => {
+    await openFilter();
+
+    await fireEvent.click(screen.getByText("Prices"));
+
+    expect(screen.getByText("Services")).toBeInTheDocument();
+  });
+
+  it("stays open when a filter checkbox is clicked", async () => {
+    await openFilter();
+
+    await fireEvent.click(screen.getByLabelText("Netflix"));
+
+    expect(screen.getByText("Services")).toBeInTheDocument();
+  });
+
+  // The Filter button is inside the watched container, so the window
+  // listener must treat its click as inside -- otherwise opening the
+  // dropdown would immediately close it again.
+  it("still opens on the Filter button despite the window listener", async () => {
+    render(Filter, baseProps);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+
+    expect(screen.getByText("Services")).toBeInTheDocument();
+  });
+
+  it("closes on Escape, which is the keyboard equivalent of clicking away", async () => {
+    await openFilter();
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByText("Services")).not.toBeInTheDocument();
+  });
+
+  it("ignores other keys", async () => {
+    await openFilter();
+
+    await fireEvent.keyDown(window, { key: "a" });
+
+    expect(screen.getByText("Services")).toBeInTheDocument();
+  });
+});
+
 describe("Services section", () => {
   it("starts with Show All and every service checked", async () => {
     await openFilter();
