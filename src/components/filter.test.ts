@@ -16,7 +16,9 @@ const baseProps = {
   prices: ["free", "subscription", "rent"],
 };
 
-function openFilter(props: Partial<typeof baseProps> = {}) {
+function openFilter(
+  props: Partial<typeof baseProps> & { canHideWatched?: boolean } = {},
+) {
   render(Filter, { ...baseProps, ...props });
   fireEvent.click(screen.getByRole("button", { name: "Filter" }));
 }
@@ -157,6 +159,46 @@ describe("Prices section", () => {
     expect(group.getByLabelText("Free")).toBeChecked();
     expect(group.getByLabelText("Subscription")).not.toBeChecked();
     expect(group.getByLabelText("Show All")).not.toBeChecked();
+  });
+});
+
+describe("Progress section", () => {
+  it("is absent for a logged-out reader, who has nothing watched to hide", async () => {
+    await openFilter();
+
+    expect(
+      screen.queryByRole("group", { name: "Progress" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Hide watched")).not.toBeInTheDocument();
+  });
+
+  it("shows an unchecked Hide watched box when the reader can have progress", async () => {
+    await openFilter({ canHideWatched: true });
+    const group = within(screen.getByRole("group", { name: "Progress" }));
+
+    expect(group.getByLabelText("Hide watched")).not.toBeChecked();
+  });
+
+  it("checks and unchecks Hide watched", async () => {
+    await openFilter({ canHideWatched: true });
+    const box = screen.getByLabelText("Hide watched");
+
+    await fireEvent.click(box);
+    expect(box).toBeChecked();
+
+    await fireEvent.click(box);
+    expect(box).not.toBeChecked();
+  });
+
+  it("does not disturb the Services or Prices sections", async () => {
+    await openFilter({ canHideWatched: true });
+
+    await fireEvent.click(screen.getByLabelText("Hide watched"));
+
+    const services = within(screen.getByRole("group", { name: "Services" }));
+    const prices = within(screen.getByRole("group", { name: "Prices" }));
+    expect(services.getByLabelText("Show All")).toBeChecked();
+    expect(prices.getByLabelText("Show All")).toBeChecked();
   });
 });
 
