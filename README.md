@@ -40,6 +40,10 @@ Use `npm run dev:app` to skip that check and run Vite alone — the right choice
 
 **Working against production directly** (rare — e.g. re-running `scripts/migrate-data-to-supabase.mjs` after a schema change ships): swap `.env.local`'s Supabase values for the production project's (Project Settings → API in the dashboard). Anything you do while pointed at production is real, shared data — not a sandbox.
 
+**Secrets stay out of the repo.** Every `.env*` file is gitignored except `.env.example`, which contains nothing but empty quotes. Nothing here needs a real credential to develop or test against: `npm test` mocks `src/lib/server/supabaseAdmin.ts` at the module boundary, so the suite passes on a machine with no `.env` file of any kind — which is exactly how CI runs it.
+
+`.gitignore` deliberately carries no `!.env.test` exception. It used to, and that was a trapdoor: this repo is public, so a real service-role key written to a tracked file is both instant and irreversible, and nothing about the mistake is loud at the time you make it. If you fork this and want a committed env file for integration tests, re-add the exception knowingly and keep real keys out of it. The local stack's keys (printed by `npm run db:start`) are safe to share — they're identical on every Supabase install — but a production project's are not, and the two are indistinguishable at a glance.
+
 ## Admin page
 
 `/admin` is a role-gated area for managing film/streaming-offer data. Access is controlled by an `is_admin` flag on Supabase's `profiles` table — unrelated to the `DEV_LOGIN_EMAIL` login above.
