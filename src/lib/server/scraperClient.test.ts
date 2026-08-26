@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { addFilm, replaceYear, scrapeAll, scrapeOne } from './scraperClient'
+import { scrapeMany, scrapeOne } from './scraperClient'
 
 function fakeResponse(status: number, body: unknown) {
     return {
@@ -14,114 +14,67 @@ describe('scraperClient', () => {
         vi.unstubAllGlobals()
     })
 
-    describe('addFilm', () => {
-        it('sends a POST with the X-API-Key header and returns the created film', async () => {
-            const fetchMock = vi.fn(async () =>
-                fakeResponse(201, { id: 202601, title: 'Some Movie', date: '10/1/2026', service: [] })
-            )
-            vi.stubGlobal('fetch', fetchMock)
-
-            const result = await addFilm('2026', { title: 'Some Movie', date: '10/1/2026' })
-
-            expect(result).toEqual({
-                ok: true,
-                data: { id: 202601, title: 'Some Movie', date: '10/1/2026', service: [] }
-            })
-            expect(fetchMock).toHaveBeenCalledWith(
-                'https://31for31scraper.vercel.app/api/years/2026',
-                expect.objectContaining({
-                    method: 'POST',
-                    headers: expect.objectContaining({ 'X-API-Key': expect.any(String) }),
-                    body: JSON.stringify({ title: 'Some Movie', date: '10/1/2026' })
-                })
-            )
-        })
-
-        it('returns the error message on a 400', async () => {
-            vi.stubGlobal(
-                'fetch',
-                vi.fn(async () => fakeResponse(400, { error: 'date collides with a film already in year' }))
-            )
-
-            const result = await addFilm('2026', { title: 'Dup' })
-
-            expect(result).toEqual({
-                ok: false,
-                status: 400,
-                error: 'date collides with a film already in year'
-            })
-        })
-
-        it('returns a fallback error message when the response has no error body', async () => {
-            vi.stubGlobal('fetch', vi.fn(async () => fakeResponse(500, {})))
-
-            const result = await addFilm('2026', { title: 'Whatever' })
-
-            expect(result).toEqual({
-                ok: false,
-                status: 500,
-                error: 'Scraper request failed with status 500'
-            })
-        })
-    })
-
-    describe('replaceYear', () => {
-        it('sends a PUT with the full film list and returns the stored list', async () => {
-            const films = [{ title: 'A', date: '10/1/2026' }, { title: 'B', date: '10/2/2026' }]
+    describe('scrapeMany', () => {
+        it('POSTs the film list with the API key header and returns one result per film', async () => {
             const fetchMock = vi.fn(async () =>
                 fakeResponse(200, [
-                    { id: 202601, title: 'A', date: '10/1/2026', service: [] },
-                    { id: 202602, title: 'B', date: '10/2/2026', service: [] }
+                    { title: 'The Ring', url: 'https://www.justwatch.com/us/movie/le-cercle', service: [] },
+                    { title: 'Film B', service: [] }
                 ])
             )
             vi.stubGlobal('fetch', fetchMock)
 
-            const result = await replaceYear('2026', films)
+            const result = await scrapeMany([
+                { title: 'The Ring', justwatch_url: 'https://www.justwatch.com/us/movie/le-cercle' },
+                { title: 'Film B' }
+            ])
 
             expect(result.ok).toBe(true)
             expect(fetchMock).toHaveBeenCalledWith(
-                'https://31for31scraper.vercel.app/api/years/2026',
-                expect.objectContaining({ method: 'PUT', body: JSON.stringify(films) })
+                'https://31for31scraper.vercel.app/api/scrape',
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: expect.objectContaining({ 'X-API-Key': expect.any(String) }),
+                    body: JSON.stringify([
+                        { title: 'The Ring', justwatch_url: 'https://www.justwatch.com/us/movie/le-cercle' },
+                        { title: 'Film B' }
+                    ])
+                })
             )
         })
 
-        it('returns the error on a 401', async () => {
-            vi.stubGlobal('fetch', vi.fn(async () => fakeResponse(401, { error: 'Unauthorized' })))
-
-            const result = await replaceYear('2026', [])
-
-            expect(result).toEqual({ ok: false, status: 401, error: 'Unauthorized' })
-        })
-    })
-
-    describe('scrapeAll', () => {
-        it('GETs /api/scrape with the API key header and returns the batch response', async () => {
-            const fetchMock = vi.fn(async () =>
-                fakeResponse(200, { '2025': [{ id: 202501, title: 'A', date: '10/1/2025', service: [] }] })
+        // A film that couldn't be scraped rides along inside a 200 with an
+        // error of its own — it must not look like a failed call.
+        it('treats a per-film error inside a 200 as success', async () => {
+            vi.stubGlobal(
+                'fetch',
+                vi.fn(async () =>
+                    fakeResponse(200, [{ title: 'Obscure', service: [], error: 'No JustWatch page found' }])
+                )
             )
-            vi.stubGlobal('fetch', fetchMock)
 
-            const result = await scrapeAll()
+            const result = await scrapeMany([{ title: 'Obscure' }])
 
             expect(result).toEqual({
                 ok: true,
-                data: { '2025': [{ id: 202501, title: 'A', date: '10/1/2025', service: [] }] }
+                data: [{ title: 'Obscure', service: [], error: 'No JustWatch page found' }]
             })
-            expect(fetchMock).toHaveBeenCalledWith(
-                'https://31for31scraper.vercel.app/api/scrape',
-                expect.objectContaining({ headers: expect.objectContaining({ 'X-API-Key': expect.any(String) }) })
-            )
         })
 
-        it('returns an error on a 500 (unconfigured server)', async () => {
-            vi.stubGlobal(
-                'fetch',
-                vi.fn(async () => fakeResponse(500, { error: 'ADMIN_API_KEY is not configured on the server' }))
-            )
+        it('returns an error on a 400 (malformed body)', async () => {
+            vi.stubGlobal('fetch', vi.fn(async () => fakeResponse(400, { error: 'films must be a non-empty array' })))
 
-            const result = await scrapeAll()
+            const result = await scrapeMany([])
 
-            expect(result).toEqual({ ok: false, status: 500, error: 'ADMIN_API_KEY is not configured on the server' })
+            expect(result).toEqual({ ok: false, status: 400, error: 'films must be a non-empty array' })
+        })
+
+        it('returns an error on a 401 (bad key)', async () => {
+            vi.stubGlobal('fetch', vi.fn(async () => fakeResponse(401, { error: 'Unauthorized' })))
+
+            const result = await scrapeMany([{ title: 'Film A' }])
+
+            expect(result).toEqual({ ok: false, status: 401, error: 'Unauthorized' })
         })
     })
 

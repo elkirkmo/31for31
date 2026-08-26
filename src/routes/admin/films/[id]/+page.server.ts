@@ -1,21 +1,10 @@
 import { error } from '@sveltejs/kit'
 import { requireAdmin } from '$lib/server/requireAdmin'
 import { supabaseAdmin } from '$lib/server/supabaseAdmin'
-import { replaceYear, scrapeOne, type ScraperOffer } from '$lib/server/scraperClient'
+import { scrapeOne, type ScraperOffer } from '$lib/server/scraperClient'
 import { applyFilmOffers } from '$lib/server/applyOffers'
 import { diffServices } from '$lib/server/diffOffers'
 import type { Actions } from './$types'
-
-type YearFilm = { id: number; date: string; title: string; justwatch_url: string | null }
-
-async function loadYearFilms(year: number) {
-    const { data } = await supabaseAdmin
-        .from('films')
-        .select('id, date, title, justwatch_url')
-        .eq('year', year)
-        .order('sort_order')
-    return (data ?? []) as YearFilm[]
-}
 
 export async function load({ params, locals }: { params: { id: string }; locals: App.Locals }) {
     await requireAdmin(locals)
@@ -36,25 +25,32 @@ export const actions: Actions = {
         await requireAdmin(locals)
 
         const filmId = Number(params.id)
-        const { data: current } = await supabaseAdmin.from('films').select('year').eq('id', filmId).single()
-        if (!current) return { error: 'Film not found.' }
-
         const form = await request.formData()
         const title = (form.get('title') as string)?.trim()
-        const date = (form.get('date') as string)?.trim() || undefined
-        const justwatch_url = (form.get('justwatch_url') as string)?.trim() || undefined
+        const date = (form.get('date') as string)?.trim()
+        const justwatch_url = (form.get('justwatch_url') as string)?.trim() || null
 
         if (!title) return { error: 'Title is required.' }
+        if (!date) return { error: 'Date is required.' }
 
-        const yearFilms = await loadYearFilms(current.year)
-        const updatedList = yearFilms.map((f) =>
-            f.id === filmId
-                ? { title, date, justwatch_url }
-                : { title: f.title, date: f.date, justwatch_url: f.justwatch_url ?? undefined }
-        )
+        // Renaming a film orphans it in every user's progress, which stores
+        // watched titles as bare strings — they'll show as "no longer on the
+        // list" on /account. Known, pre-existing, and not worth blocking an
+        // edit over; noted so it isn't a surprise.
+        const { error: updateError } = await supabaseAdmin
+            .from('films')
+            .update({ title, date, justwatch_url })
+            .eq('id', filmId)
+            .select('id')
+            .single()
 
-        const result = await replaceYear(String(current.year), updatedList)
-        if (!result.ok) return { error: result.error }
+        if (updateError) {
+            if (updateError.code === '23505') {
+                return { error: `Another film that year is already called ${title}.` }
+            }
+            if (updateError.code === 'PGRST116') return { error: 'Film not found.' }
+            return { error: updateError.message }
+        }
 
         return { success: true }
     },
@@ -63,16 +59,20 @@ export const actions: Actions = {
         await requireAdmin(locals)
 
         const filmId = Number(params.id)
-        const { data: current } = await supabaseAdmin.from('films').select('year').eq('id', filmId).single()
-        if (!current) return { error: 'Film not found.' }
 
-        const yearFilms = await loadYearFilms(current.year)
-        const updatedList = yearFilms
-            .filter((f) => f.id !== filmId)
-            .map((f) => ({ title: f.title, date: f.date, justwatch_url: f.justwatch_url ?? undefined }))
+        // services cascade with the row (FK to films.id ON DELETE CASCADE),
+        // so this is the whole operation.
+        const { error: deleteError } = await supabaseAdmin
+            .from('films')
+            .delete()
+            .eq('id', filmId)
+            .select('id')
+            .single()
 
-        const result = await replaceYear(String(current.year), updatedList)
-        if (!result.ok) return { error: result.error }
+        if (deleteError) {
+            if (deleteError.code === 'PGRST116') return { error: 'Film not found.' }
+            return { error: deleteError.message }
+        }
 
         return { success: true, deleted: true }
     },

@@ -5,10 +5,8 @@ vi.mock('$lib/server/requireAdmin', () => ({
     requireAdmin: vi.fn(async () => ({ user: { id: 'admin-1' } }))
 }))
 
-const replaceYearMock = vi.fn()
 const scrapeOneMock = vi.fn()
 vi.mock('$lib/server/scraperClient', () => ({
-    replaceYear: (...args: unknown[]) => replaceYearMock(...args),
     scrapeOne: (...args: unknown[]) => scrapeOneMock(...args)
 }))
 
@@ -82,15 +80,23 @@ describe('admin film [id] load', () => {
 })
 
 describe('admin film [id] actions', () => {
-    const yearFilms = [
-        { id: 1, date: '10/1/2025', title: 'Film A', justwatch_url: null, year: 2025 },
-        { id: 2, date: '10/2/2025', title: 'Film B', justwatch_url: 'https://x', year: 2025 }
-    ]
+    const updateMock = vi.fn()
+    const deleteMock = vi.fn()
+
+    // films is written directly now: .update(...).eq().select().single()
+    // and .delete().eq().select().single().
+    function writableFilms(result: Record<string, unknown> = { data: { id: 1 }, error: null }) {
+        const tail = { eq: vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn(async () => result) })) })) }
+        updateMock.mockImplementation(() => tail)
+        deleteMock.mockImplementation(() => tail)
+        return { update: (...a: unknown[]) => updateMock(...a), delete: (...a: unknown[]) => deleteMock(...a) }
+    }
 
     beforeEach(() => {
         fromMock.mockReset()
-        replaceYearMock.mockReset()
-        fromMock.mockImplementation(() => makeFilmsBuilder(yearFilms))
+        updateMock.mockReset()
+        deleteMock.mockReset()
+        fromMock.mockImplementation(() => writableFilms())
     })
 
     function formDataRequest(fields: Record<string, string>) {
@@ -99,27 +105,46 @@ describe('admin film [id] actions', () => {
         return { formData: async () => formData } as unknown as Request
     }
 
-    it('update rebuilds the full year list from our table and PUTs it to the scraper', async () => {
-        replaceYearMock.mockResolvedValue({ ok: true, data: [] })
-
+    it('update writes the film row directly', async () => {
         const event = {
-            request: formDataRequest({ title: 'Film A Renamed', date: '10/1/2025', justwatch_url: '' }),
+            request: formDataRequest({ title: ' Film A Renamed ', date: '10/1/2025', justwatch_url: '' }),
             params: { id: '1' },
             locals: {}
         } as unknown as Parameters<typeof actions.update>[0]
 
         const result = await actions.update(event)
 
-        expect(replaceYearMock).toHaveBeenCalledWith('2025', [
-            { title: 'Film A Renamed', date: '10/1/2025', justwatch_url: undefined },
-            { title: 'Film B', date: '10/2/2025', justwatch_url: 'https://x' }
-        ])
+        expect(updateMock).toHaveBeenCalledWith({
+            title: 'Film A Renamed',
+            date: '10/1/2025',
+            justwatch_url: null
+        })
         expect(result).toEqual({ success: true })
+    })
+
+    // The whole point of the migration: an override set here is what the
+    // next scrape actually uses.
+    it('update stores a justwatch_url override', async () => {
+        const event = {
+            request: formDataRequest({
+                title: 'The Ring',
+                date: '10/20/2024',
+                justwatch_url: 'https://www.justwatch.com/us/movie/le-cercle'
+            }),
+            params: { id: '1' },
+            locals: {}
+        } as unknown as Parameters<typeof actions.update>[0]
+
+        await actions.update(event)
+
+        expect(updateMock).toHaveBeenCalledWith(
+            expect.objectContaining({ justwatch_url: 'https://www.justwatch.com/us/movie/le-cercle' })
+        )
     })
 
     it('update returns an error when title is blank', async () => {
         const event = {
-            request: formDataRequest({ title: '  ', date: '', justwatch_url: '' }),
+            request: formDataRequest({ title: '  ', date: '10/1/2025', justwatch_url: '' }),
             params: { id: '1' },
             locals: {}
         } as unknown as Parameters<typeof actions.update>[0]
@@ -127,12 +152,10 @@ describe('admin film [id] actions', () => {
         const result = await actions.update(event)
 
         expect(result).toEqual({ error: 'Title is required.' })
-        expect(replaceYearMock).not.toHaveBeenCalled()
+        expect(updateMock).not.toHaveBeenCalled()
     })
 
-    it('update surfaces the scraper error on failure', async () => {
-        replaceYearMock.mockResolvedValue({ ok: false, status: 401, error: 'Unauthorized' })
-
+    it('update returns an error when date is blank, which the column rejects', async () => {
         const event = {
             request: formDataRequest({ title: 'Film A', date: '', justwatch_url: '' }),
             params: { id: '1' },
@@ -141,23 +164,54 @@ describe('admin film [id] actions', () => {
 
         const result = await actions.update(event)
 
-        expect(result).toEqual({ error: 'Unauthorized' })
+        expect(result).toEqual({ error: 'Date is required.' })
+        expect(updateMock).not.toHaveBeenCalled()
     })
 
-    it('delete removes the film from the year list before PUTing it to the scraper', async () => {
-        replaceYearMock.mockResolvedValue({ ok: true, data: [] })
-
+    it('update explains a duplicate title rather than leaking the constraint', async () => {
+        fromMock.mockImplementation(() =>
+            writableFilms({ data: null, error: { code: '23505', message: 'duplicate key' } })
+        )
         const event = {
+            request: formDataRequest({ title: 'Film B', date: '10/1/2025', justwatch_url: '' }),
             params: { id: '1' },
             locals: {}
-        } as unknown as Parameters<typeof actions.delete>[0]
+        } as unknown as Parameters<typeof actions.update>[0]
+
+        const result = await actions.update(event)
+
+        expect(result).toEqual({ error: 'Another film that year is already called Film B.' })
+    })
+
+    it('update reports a missing film', async () => {
+        fromMock.mockImplementation(() =>
+            writableFilms({ data: null, error: { code: 'PGRST116', message: 'no rows' } })
+        )
+        const event = {
+            request: formDataRequest({ title: 'Film A', date: '10/1/2025', justwatch_url: '' }),
+            params: { id: '999' },
+            locals: {}
+        } as unknown as Parameters<typeof actions.update>[0]
+
+        expect(await actions.update(event)).toEqual({ error: 'Film not found.' })
+    })
+
+    it('delete removes the film row, letting services cascade', async () => {
+        const event = { params: { id: '1' }, locals: {} } as unknown as Parameters<typeof actions.delete>[0]
 
         const result = await actions.delete(event)
 
-        expect(replaceYearMock).toHaveBeenCalledWith('2025', [
-            { title: 'Film B', date: '10/2/2025', justwatch_url: 'https://x' }
-        ])
+        expect(deleteMock).toHaveBeenCalled()
         expect(result).toEqual({ success: true, deleted: true })
+    })
+
+    it('delete reports a missing film', async () => {
+        fromMock.mockImplementation(() =>
+            writableFilms({ data: null, error: { code: 'PGRST116', message: 'no rows' } })
+        )
+        const event = { params: { id: '999' }, locals: {} } as unknown as Parameters<typeof actions.delete>[0]
+
+        expect(await actions.delete(event)).toEqual({ error: 'Film not found.' })
     })
 })
 
