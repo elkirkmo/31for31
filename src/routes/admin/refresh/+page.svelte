@@ -103,14 +103,17 @@
     </div>
   {/if}
 
-  {#if form.unmatched.length > 0}
-    <h3 class="text-lg mb-2">Unmatched ({form.unmatched.length})</h3>
+  {#if form.failed.length > 0}
+    <h3 class="text-lg mb-2">Failed to scrape ({form.failed.length})</h3>
     <p class="text-sm opacity-70 mb-2">
-      In the scraper's own list but not found in our films table by (year, title).
+      Left out of the diff above rather than shown as losing every offer — a
+      film the scraper couldn't read isn't a film with nothing to watch. Most
+      often a title whose JustWatch slug can't be guessed, which a
+      <code>justwatch_url</code> on the film fixes.
     </p>
     <ul class="text-sm opacity-70">
-      {#each form.unmatched as title}
-        <li>{title}</li>
+      {#each form.failed as message}
+        <li>{message}</li>
       {/each}
     </ul>
   {/if}

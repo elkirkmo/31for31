@@ -87,6 +87,26 @@ export async function replaceYear(year: string, films: FilmInput[]): Promise<Scr
     return parseResult<ScraperFilmEntry[]>(res)
 }
 
+export type ScrapeBatchFilm = {
+    title: string
+    justwatch_url?: string
+}
+
+// POST /api/scrape — scrapes a caller-supplied list and returns one
+// FilmResult per input film, in request order. Stateless: unlike the GET
+// batch below it never consults the scraper's own data.json, which is what
+// lets our films table be the only list that matters. A single film failing
+// comes back as service: [] with an error rather than failing the request,
+// so a non-ok result here means the whole call failed (401/400/500).
+export async function scrapeMany(films: ScrapeBatchFilm[]): Promise<ScraperResult<FilmResult[]>> {
+    const res = await fetch(`${SCRAPER_BASE_URL}/api/scrape`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify(films)
+    })
+    return parseResult<FilmResult[]>(res)
+}
+
 // GET /api/scrape — scrapes every film the scraper itself knows about and
 // returns current offers for all of them. Never writes anywhere on the
 // scraper's end; the caller decides what to apply. A single film failing
