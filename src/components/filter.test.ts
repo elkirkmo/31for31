@@ -16,7 +16,9 @@ const baseProps = {
   prices: ["free", "subscription", "rent"],
 };
 
-function openFilter(props: Partial<typeof baseProps> = {}) {
+function openFilter(
+  props: Partial<typeof baseProps> & { canHideWatched?: boolean } = {},
+) {
   render(Filter, { ...baseProps, ...props });
   fireEvent.click(screen.getByRole("button", { name: "Filter" }));
 }
@@ -51,6 +53,60 @@ describe("dropdown toggle", () => {
     await fireEvent.click(button);
 
     expect(screen.queryByText("Services")).not.toBeInTheDocument();
+  });
+});
+
+describe("dismissing the dropdown", () => {
+  it("closes when a click lands outside the component", async () => {
+    await openFilter();
+    expect(screen.getByText("Services")).toBeInTheDocument();
+
+    await fireEvent.click(document.body);
+
+    expect(screen.queryByText("Services")).not.toBeInTheDocument();
+  });
+
+  it("stays open when a click lands inside the dropdown", async () => {
+    await openFilter();
+
+    await fireEvent.click(screen.getByText("Prices"));
+
+    expect(screen.getByText("Services")).toBeInTheDocument();
+  });
+
+  it("stays open when a filter checkbox is clicked", async () => {
+    await openFilter();
+
+    await fireEvent.click(screen.getByLabelText("Netflix"));
+
+    expect(screen.getByText("Services")).toBeInTheDocument();
+  });
+
+  // The Filter button is inside the watched container, so the window
+  // listener must treat its click as inside -- otherwise opening the
+  // dropdown would immediately close it again.
+  it("still opens on the Filter button despite the window listener", async () => {
+    render(Filter, baseProps);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+
+    expect(screen.getByText("Services")).toBeInTheDocument();
+  });
+
+  it("closes on Escape, which is the keyboard equivalent of clicking away", async () => {
+    await openFilter();
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByText("Services")).not.toBeInTheDocument();
+  });
+
+  it("ignores other keys", async () => {
+    await openFilter();
+
+    await fireEvent.keyDown(window, { key: "a" });
+
+    expect(screen.getByText("Services")).toBeInTheDocument();
   });
 });
 
@@ -157,6 +213,46 @@ describe("Prices section", () => {
     expect(group.getByLabelText("Free")).toBeChecked();
     expect(group.getByLabelText("Subscription")).not.toBeChecked();
     expect(group.getByLabelText("Show All")).not.toBeChecked();
+  });
+});
+
+describe("Progress section", () => {
+  it("is absent for a logged-out reader, who has nothing watched to hide", async () => {
+    await openFilter();
+
+    expect(
+      screen.queryByRole("group", { name: "Progress" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Hide watched")).not.toBeInTheDocument();
+  });
+
+  it("shows an unchecked Hide watched box when the reader can have progress", async () => {
+    await openFilter({ canHideWatched: true });
+    const group = within(screen.getByRole("group", { name: "Progress" }));
+
+    expect(group.getByLabelText("Hide watched")).not.toBeChecked();
+  });
+
+  it("checks and unchecks Hide watched", async () => {
+    await openFilter({ canHideWatched: true });
+    const box = screen.getByLabelText("Hide watched");
+
+    await fireEvent.click(box);
+    expect(box).toBeChecked();
+
+    await fireEvent.click(box);
+    expect(box).not.toBeChecked();
+  });
+
+  it("does not disturb the Services or Prices sections", async () => {
+    await openFilter({ canHideWatched: true });
+
+    await fireEvent.click(screen.getByLabelText("Hide watched"));
+
+    const services = within(screen.getByRole("group", { name: "Services" }));
+    const prices = within(screen.getByRole("group", { name: "Prices" }));
+    expect(services.getByLabelText("Show All")).toBeChecked();
+    expect(prices.getByLabelText("Show All")).toBeChecked();
   });
 });
 
