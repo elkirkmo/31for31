@@ -4,10 +4,10 @@ vi.mock('$lib/server/requireAdmin', () => ({
     requireAdmin: vi.fn(async () => ({ user: { id: 'admin-1' } }))
 }))
 
-const scrapeAllMock = vi.fn()
+const scrapeManyMock = vi.fn()
 const scrapeOneMock = vi.fn()
 vi.mock('$lib/server/scraperClient', () => ({
-    scrapeAll: (...args: unknown[]) => scrapeAllMock(...args),
+    scrapeMany: (...args: unknown[]) => scrapeManyMock(...args),
     scrapeOne: (...args: unknown[]) => scrapeOneMock(...args)
 }))
 
@@ -27,10 +27,17 @@ function offer(name: string, overrides: Record<string, unknown> = {}) {
     return { name, type: 'free', price: null, currency: null, link: null, icon: null, ...overrides }
 }
 
-// .from('films').select(...) awaited directly (no .eq/.single) — used by
-// loadFilmsWithServices in preview/applyAll.
+// .from('films').select(...).order(...).order(...) awaited — used by
+// loadFilmsWithServices in preview/applyAll. Results are paired with this
+// list by index, so its order is what the pairing depends on.
 function thenableFilms(rows: Record<string, unknown>[]) {
-    return { select: vi.fn(() => ({ then: (resolve: (v: unknown) => void) => resolve({ data: rows }) })) }
+    const awaited = { then: (resolve: (v: unknown) => void) => resolve({ data: rows }) }
+    return { select: vi.fn(() => ({ order: vi.fn(() => ({ order: vi.fn(() => awaited) })) })) }
+}
+
+// One scraper result per film, in the same order as the request.
+function scraped(...entries: Record<string, unknown>[]) {
+    return { ok: true, data: entries }
 }
 
 // .from('films').select(...).eq(...).single() — used by applyOne.
@@ -40,23 +47,24 @@ function singleFilm(row: Record<string, unknown> | null) {
 
 describe('admin refresh preview action', () => {
     beforeEach(() => {
-        scrapeAllMock.mockReset()
+        scrapeManyMock.mockReset()
         fromMock.mockReset()
     })
 
-    it('diffs matched films and lists unmatched scraper entries', async () => {
-        scrapeAllMock.mockResolvedValue({
-            ok: true,
-            data: {
-                '2025': [
-                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [offer('Tubi', { type: 'free' })] },
-                    { id: 202502, title: 'Unknown Film', date: '10/2/2025', service: [] }
-                ],
-                textContent: { heading: 'not a film list' }
-            }
-        })
+    it('diffs every film in our table against its fresh scrape', async () => {
         fromMock.mockReturnValue(
-            thenableFilms([{ id: 1, year: 2025, title: 'Film A', services: [offer('Netflix', { type: 'subscription' })] }])
+            thenableFilms([
+                {
+                    id: 1,
+                    year: 2025,
+                    title: 'Film A',
+                    justwatch_url: null,
+                    services: [offer('Netflix', { type: 'subscription' })]
+                }
+            ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped({ title: 'Film A', service: [offer('Tubi', { type: 'free' })] })
         )
 
         const result = await actions.preview({ locals: {} } as unknown as Parameters<typeof actions.preview>[0])
@@ -65,17 +73,88 @@ describe('admin refresh preview action', () => {
             preview: [
                 { filmId: 1, year: 2025, title: 'Film A', oldCount: 1, newCount: 1, added: 1, removed: 1, changed: 0 }
             ],
-            unmatched: ['Unknown Film (2025)']
+            failed: []
         })
     })
 
-    it('returns the scraper error and does not query films when scrapeAll fails', async () => {
-        scrapeAllMock.mockResolvedValue({ ok: false, status: 500, error: 'ADMIN_API_KEY is not configured' })
+    // Our table is the list now — the scraper is told what to scrape rather
+    // than consulting its own copy, and the override travels with the title.
+    it('sends the scraper every film title and its justwatch_url override', async () => {
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2024, title: 'The Ring', justwatch_url: 'https://www.justwatch.com/us/movie/le-cercle', services: [] },
+                { id: 2, year: 2025, title: 'Film B', justwatch_url: null, services: [] }
+            ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped({ title: 'The Ring', service: [] }, { title: 'Film B', service: [] })
+        )
+
+        await actions.preview({ locals: {} } as unknown as Parameters<typeof actions.preview>[0])
+
+        expect(scrapeManyMock).toHaveBeenCalledWith([
+            { title: 'The Ring', justwatch_url: 'https://www.justwatch.com/us/movie/le-cercle' },
+            { title: 'Film B', justwatch_url: undefined }
+        ])
+    })
+
+    // A film the scraper couldn't read is not a film with no offers.
+    // Diffing it would report every offer being removed.
+    it('lists a failed scrape separately instead of diffing it as an empty result', async () => {
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [offer('Tubi')] },
+                { id: 2, year: 2025, title: 'Obscure Film', justwatch_url: null, services: [offer('Netflix')] }
+            ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped(
+                { title: 'Film A', service: [offer('Tubi')] },
+                { title: 'Obscure Film', service: [], error: 'No JustWatch page found' }
+            )
+        )
+
+        const result = (await actions.preview({ locals: {} } as unknown as Parameters<typeof actions.preview>[0])) as {
+            preview: { title: string }[]
+            failed: string[]
+        }
+
+        expect(result.preview.map((r) => r.title)).toEqual(['Film A'])
+        expect(result.failed).toEqual(['Obscure Film (2025): No JustWatch page found'])
+    })
+
+    it('returns the scraper error when the call itself fails', async () => {
+        fromMock.mockReturnValue(thenableFilms([{ id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [] }]))
+        scrapeManyMock.mockResolvedValue({ ok: false, status: 500, error: 'ADMIN_API_KEY is not configured' })
 
         const result = await actions.preview({ locals: {} } as unknown as Parameters<typeof actions.preview>[0])
 
         expect(result).toEqual({ error: 'ADMIN_API_KEY is not configured' })
-        expect(fromMock).not.toHaveBeenCalled()
+    })
+
+    // Results are paired with films by index, so a length mismatch would
+    // write every film after the discrepancy with another film's offers.
+    it('refuses rather than mispairing when the scraper returns the wrong number of results', async () => {
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [] },
+                { id: 2, year: 2025, title: 'Film B', justwatch_url: null, services: [] }
+            ])
+        )
+        scrapeManyMock.mockResolvedValue(scraped({ title: 'Film A', service: [offer('Tubi')] }))
+
+        const result = await actions.preview({ locals: {} } as unknown as Parameters<typeof actions.preview>[0])
+
+        expect(result).toMatchObject({ error: expect.stringContaining('1 results for 2 films') })
+    })
+
+    it('does not call the scraper when there are no films', async () => {
+        fromMock.mockReturnValue(thenableFilms([]))
+
+        const result = await actions.preview({ locals: {} } as unknown as Parameters<typeof actions.preview>[0])
+
+        expect(result).toEqual({ preview: [], failed: [] })
+        expect(scrapeManyMock).not.toHaveBeenCalled()
     })
 })
 
@@ -142,26 +221,22 @@ describe('admin refresh applyOne action', () => {
 describe('admin refresh applyAll action', () => {
     beforeEach(() => {
         fromMock.mockReset()
-        scrapeAllMock.mockReset()
+        scrapeManyMock.mockReset()
         applyFilmOffersMock.mockReset()
     })
 
-    it('applies every matched film and reports per-film scrape errors', async () => {
-        scrapeAllMock.mockResolvedValue({
-            ok: true,
-            data: {
-                '2025': [
-                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [offer('Tubi')] },
-                    { id: 202502, title: 'Film B', date: '10/2/2025', service: [], error: 'timed out' },
-                    { id: 202503, title: 'Unmatched Film', date: '10/3/2025', service: [] }
-                ]
-            }
-        })
+    it('applies every film that scraped cleanly and reports the ones that did not', async () => {
         fromMock.mockReturnValue(
             thenableFilms([
-                { id: 1, year: 2025, title: 'Film A', services: [] },
-                { id: 2, year: 2025, title: 'Film B', services: [] }
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [] },
+                { id: 2, year: 2025, title: 'Film B', justwatch_url: null, services: [] }
             ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped(
+                { title: 'Film A', service: [offer('Tubi')] },
+                { title: 'Film B', service: [], error: 'timed out' }
+            )
         )
         applyFilmOffersMock.mockResolvedValue({ ok: true })
 
@@ -175,20 +250,14 @@ describe('admin refresh applyAll action', () => {
     // The rule: a couple of films streaming nowhere is normal, every film
     // streaming nowhere is a broken scrape.
     it('refuses the whole run when the scrape found offers for nothing', async () => {
-        scrapeAllMock.mockResolvedValue({
-            ok: true,
-            data: {
-                '2025': [
-                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [] },
-                    { id: 202502, title: 'Film B', date: '10/2/2025', service: [] }
-                ]
-            }
-        })
         fromMock.mockReturnValue(
             thenableFilms([
-                { id: 1, year: 2025, title: 'Film A', services: [offer('Tubi')] },
-                { id: 2, year: 2025, title: 'Film B', services: [offer('Netflix')] }
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [offer('Tubi')] },
+                { id: 2, year: 2025, title: 'Film B', justwatch_url: null, services: [offer('Netflix')] }
             ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped({ title: 'Film A', service: [] }, { title: 'Film B', service: [] })
         )
 
         const result = await actions.applyAll({ locals: {} } as unknown as Parameters<typeof actions.applyAll>[0])
@@ -198,20 +267,14 @@ describe('admin refresh applyAll action', () => {
     })
 
     it('proceeds when even one film still has offers', async () => {
-        scrapeAllMock.mockResolvedValue({
-            ok: true,
-            data: {
-                '2025': [
-                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [offer('Tubi')] },
-                    { id: 202502, title: 'Film B', date: '10/2/2025', service: [] }
-                ]
-            }
-        })
         fromMock.mockReturnValue(
             thenableFilms([
-                { id: 1, year: 2025, title: 'Film A', services: [] },
-                { id: 2, year: 2025, title: 'Film B', services: [offer('Netflix')] }
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [] },
+                { id: 2, year: 2025, title: 'Film B', justwatch_url: null, services: [offer('Netflix')] }
             ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped({ title: 'Film A', service: [offer('Tubi')] }, { title: 'Film B', service: [] })
         )
         applyFilmOffersMock.mockResolvedValue({ ok: true })
 
@@ -221,26 +284,43 @@ describe('admin refresh applyAll action', () => {
         expect(result).toMatchObject({ appliedAll: 2 })
     })
 
-    it('names the films that went from having offers to having none', async () => {
-        scrapeAllMock.mockResolvedValue({
-            ok: true,
-            data: {
-                '2025': [
-                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [offer('Tubi')] },
-                    { id: 202502, title: 'Bride of Frankenstein', date: '10/2/2025', service: [] }
-                ]
-            }
-        })
+    // A failed scrape must not count towards the all-empty guard, or one
+    // broken run could look like "every film has offers" and sail through.
+    it('does not let failed scrapes satisfy the all-empty guard', async () => {
         fromMock.mockReturnValue(
             thenableFilms([
-                { id: 1, year: 2025, title: 'Film A', services: [] },
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [offer('Tubi')] },
+                { id: 2, year: 2025, title: 'Film B', justwatch_url: null, services: [offer('Netflix')] }
+            ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped(
+                { title: 'Film A', service: [], error: 'timed out' },
+                { title: 'Film B', service: [] }
+            )
+        )
+
+        const result = await actions.applyAll({ locals: {} } as unknown as Parameters<typeof actions.applyAll>[0])
+
+        expect(applyFilmOffersMock).not.toHaveBeenCalled()
+        expect(result).toMatchObject({ error: expect.stringContaining('no streaming offers for any') })
+    })
+
+    it('names the films that went from having offers to having none', async () => {
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [] },
                 {
                     id: 2,
                     year: 2025,
                     title: 'Bride of Frankenstein',
+                    justwatch_url: null,
                     services: [offer('Netflix'), offer('Tubi')]
                 }
             ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped({ title: 'Film A', service: [offer('Tubi')] }, { title: 'Bride of Frankenstein', service: [] })
         )
         applyFilmOffersMock.mockResolvedValue({ ok: true })
 
@@ -252,25 +332,34 @@ describe('admin refresh applyAll action', () => {
     })
 
     it('does not flag a film that already had no offers', async () => {
-        scrapeAllMock.mockResolvedValue({
-            ok: true,
-            data: {
-                '2025': [
-                    { id: 202501, title: 'Film A', date: '10/1/2025', service: [offer('Tubi')] },
-                    { id: 202502, title: 'Thanksgiving', date: '10/2/2025', service: [] }
-                ]
-            }
-        })
         fromMock.mockReturnValue(
             thenableFilms([
-                { id: 1, year: 2025, title: 'Film A', services: [] },
-                { id: 2, year: 2025, title: 'Thanksgiving', services: [] }
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [] },
+                { id: 2, year: 2025, title: 'Thanksgiving', justwatch_url: null, services: [] }
             ])
+        )
+        scrapeManyMock.mockResolvedValue(
+            scraped({ title: 'Film A', service: [offer('Tubi')] }, { title: 'Thanksgiving', service: [] })
         )
         applyFilmOffersMock.mockResolvedValue({ ok: true })
 
         const result = await actions.applyAll({ locals: {} } as unknown as Parameters<typeof actions.applyAll>[0])
 
         expect(result).toMatchObject({ cleared: [] })
+    })
+
+    it('refuses rather than mispairing when the scraper returns the wrong number of results', async () => {
+        fromMock.mockReturnValue(
+            thenableFilms([
+                { id: 1, year: 2025, title: 'Film A', justwatch_url: null, services: [] },
+                { id: 2, year: 2025, title: 'Film B', justwatch_url: null, services: [] }
+            ])
+        )
+        scrapeManyMock.mockResolvedValue(scraped({ title: 'Film A', service: [offer('Tubi')] }))
+
+        const result = await actions.applyAll({ locals: {} } as unknown as Parameters<typeof actions.applyAll>[0])
+
+        expect(applyFilmOffersMock).not.toHaveBeenCalled()
+        expect(result).toMatchObject({ error: expect.stringContaining('1 results for 2 films') })
     })
 })

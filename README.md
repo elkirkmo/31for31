@@ -71,7 +71,13 @@ In `npm run dev`, an "Admin (dev)" link appears in the header for any logged-in 
 
 ### Editing films
 
-`/admin/films` add/edit/delete calls the [31for31scraper](https://31for31scraper.vercel.app) API rather than writing to Supabase directly, so it needs `SCRAPER_API_KEY` in `.env.local` (must match that service's own `ADMIN_API_KEY`). **Known limitation:** the scraper's write endpoints currently persist only to its own `data.json`, which is read-only on Vercel production — writes succeed against the scraper but won't take effect until the scraper migrates its storage to Supabase. Called out in the admin UI itself, not just here.
+`/admin/films` add/edit/delete writes the `films` table in Supabase directly. Deleting a film takes its streaming offers with it — `services` foreign-keys to `films(id)` with `ON DELETE CASCADE`.
+
+**The films table is the source of truth for which films exist.** The scraper holds no list of its own: `/admin/refresh` reads the table, hands the scraper that list via `POST /api/scrape`, and writes the returned offers back. So a `justwatch_url` set on a film is what the next scrape actually uses — that override is how you pin a title whose JustWatch slug can't be guessed from its name (*The Ring* (2024) resolves to Hitchcock's 1927 silent without one).
+
+Because the scraper is told what to scrape rather than consulting its own copy, results come back in request order and are paired to film rows by position — there's no longer a `(year, title)` join between the two systems, so renaming a film can't orphan it mid-refresh.
+
+Still needs `SCRAPER_API_KEY` in `.env.local` (must match that service's own `ADMIN_API_KEY`) for the scraping itself.
 
 ## User accounts
 

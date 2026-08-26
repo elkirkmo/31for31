@@ -2,20 +2,9 @@ import { env } from '$env/dynamic/private'
 
 const SCRAPER_BASE_URL = 'https://31for31scraper.vercel.app'
 
-export type FilmInput = {
-    title: string
-    date?: string
-    justwatch_url?: string
-}
-
-export type ScraperFilmEntry = {
-    id: number
-    date: string
-    title: string
-    justwatch_url?: string | null
-    service: unknown[]
-    error?: string | null
-}
+// The scraper is stateless as far as this app is concerned: it is told which
+// films to scrape and returns their current offers. The films table is the
+// only list of films — nothing here reads or writes the scraper's own copy.
 
 export type ScraperResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string }
 
@@ -27,19 +16,6 @@ export type ScraperOffer = {
     link: string | null
     icon: string | null
 }
-
-export type BatchFilmEntry = {
-    id: number
-    date: string
-    title: string
-    justwatch_url?: string | null
-    service: ScraperOffer[]
-    error?: string | null
-}
-
-// Year-keyed (e.g. "2025"); non-film keys like "textContent" pass through
-// unchanged, so entries aren't always an array — narrow before use.
-export type BatchScrapeResponse = Record<string, BatchFilmEntry[] | unknown>
 
 export type FilmResult = {
     title: string
@@ -63,43 +39,30 @@ async function parseResult<T>(res: Response): Promise<ScraperResult<T>> {
     return { ok: true, data: body as T }
 }
 
-// POST /api/years/{year} — appends one film to the scraper's own list for
-// that year. Does not touch our films table (see plan: Phase 2 write-path
-// decision — this only persists once the scraper migrates to Supabase).
-export async function addFilm(year: string, film: FilmInput): Promise<ScraperResult<ScraperFilmEntry>> {
-    const res = await fetch(`${SCRAPER_BASE_URL}/api/years/${year}`, {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify(film)
-    })
-    return parseResult<ScraperFilmEntry>(res)
+export type ScrapeBatchFilm = {
+    title: string
+    justwatch_url?: string
 }
 
-// PUT /api/years/{year} — replaces the scraper's own list for that year
-// wholesale. Used for edit/delete, since the scraper has no per-film
-// update/delete endpoint — callers must supply the full desired list.
-export async function replaceYear(year: string, films: FilmInput[]): Promise<ScraperResult<ScraperFilmEntry[]>> {
-    const res = await fetch(`${SCRAPER_BASE_URL}/api/years/${year}`, {
-        method: 'PUT',
+// POST /api/scrape — scrapes a caller-supplied list and returns one
+// FilmResult per input film, in request order. This is the batch path: the
+// films table decides what gets scraped, so there is no second list to
+// drift from. A single film failing comes back as service: [] with an
+// error rather than failing the request, so a non-ok result here means the
+// whole call failed (400 malformed, 401 bad key, 500 unconfigured).
+export async function scrapeMany(films: ScrapeBatchFilm[]): Promise<ScraperResult<FilmResult[]>> {
+    const res = await fetch(`${SCRAPER_BASE_URL}/api/scrape`, {
+        method: 'POST',
         headers: headers(),
         body: JSON.stringify(films)
     })
-    return parseResult<ScraperFilmEntry[]>(res)
-}
-
-// GET /api/scrape — scrapes every film the scraper itself knows about and
-// returns current offers for all of them. Never writes anywhere on the
-// scraper's end; the caller decides what to apply. A single film failing
-// doesn't fail the request — it comes back with service: [] and an error.
-export async function scrapeAll(): Promise<ScraperResult<BatchScrapeResponse>> {
-    const res = await fetch(`${SCRAPER_BASE_URL}/api/scrape`, { headers: headers() })
-    return parseResult<BatchScrapeResponse>(res)
+    return parseResult<FilmResult[]>(res)
 }
 
 // GET /api/scrape?title=&url= — scrapes one film ad hoc, without depending
-// on the scraper's own film list. This is the only way to fetch offers for
-// a film the admin just added (see the batch-refresh known limitation).
-// 404 (no JustWatch page found) and 502 (request to JustWatch itself
+// on a list at all. Used for the single-film rescrape on /admin/films/[id]
+// and /admin/refresh's per-film Apply, where scrapeMany's batch shape would
+// just be noise. 404 (no JustWatch page found) and 502 (request to JustWatch itself
 // failed) still return a FilmResult body with `error` set — treated as a
 // successful client call so the caller can show the per-film error inline,
 // the same way batch failures are surfaced. Only a missing/invalid API key

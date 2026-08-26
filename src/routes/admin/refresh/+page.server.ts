@@ -1,19 +1,51 @@
 import { requireAdmin } from '$lib/server/requireAdmin'
 import { supabaseAdmin } from '$lib/server/supabaseAdmin'
-import { scrapeAll, scrapeOne, type ScraperOffer } from '$lib/server/scraperClient'
+import { scrapeMany, scrapeOne, type FilmResult, type ScraperOffer } from '$lib/server/scraperClient'
 import { applyFilmOffers } from '$lib/server/applyOffers'
 import { diffServices } from '$lib/server/diffOffers'
 import type { Actions } from './$types'
 
-type FilmRow = { id: number; year: number; title: string; services: ScraperOffer[] }
+type FilmRow = {
+    id: number
+    year: number
+    title: string
+    justwatch_url: string | null
+    services: ScraperOffer[]
+}
 
 async function loadFilmsWithServices() {
-    const { data } = await supabaseAdmin.from('films').select('id, year, title, services(*)')
+    const { data } = await supabaseAdmin
+        .from('films')
+        .select('id, year, title, justwatch_url, services(*)')
+        .order('year')
+        .order('sort_order')
     return (data ?? []) as unknown as FilmRow[]
 }
 
-function filmKey(year: string | number, title: string) {
-    return `${year}::${title}`
+// Our films table is the list now, so the scraper is told what to scrape
+// rather than consulting its own copy. That removes the year::title join
+// the two sides used to agree on -- results come back in request order, so
+// a film is identified by its row, and renaming one can no longer orphan it.
+async function scrapeFilms(films: FilmRow[]) {
+    const result = await scrapeMany(
+        films.map((film) => ({
+            title: film.title,
+            justwatch_url: film.justwatch_url ?? undefined
+        }))
+    )
+    if (!result.ok) return result
+
+    // Pairing by index is only sound while the lengths agree. If they ever
+    // don't, every film after the discrepancy would be written with another
+    // film's offers -- refuse rather than corrupt the catalogue.
+    if (result.data.length !== films.length) {
+        return {
+            ok: false as const,
+            status: 502,
+            error: `Scraper returned ${result.data.length} results for ${films.length} films. Nothing was changed.`
+        }
+    }
+    return result
 }
 
 export async function load({ locals }: { locals: App.Locals }) {
@@ -22,16 +54,16 @@ export async function load({ locals }: { locals: App.Locals }) {
 }
 
 export const actions: Actions = {
-    // Scrapes every film the scraper knows about and diffs it against what
-    // we have stored — never writes anything. Review, then Apply.
+    // Scrapes every film in our table and diffs the result against what we
+    // have stored -- never writes anything. Review, then Apply.
     preview: async ({ locals }) => {
         await requireAdmin(locals)
 
-        const scrapeResult = await scrapeAll()
-        if (!scrapeResult.ok) return { error: scrapeResult.error }
-
         const films = await loadFilmsWithServices()
-        const filmsByKey = new Map(films.map((f) => [filmKey(f.year, f.title), f]))
+        if (films.length === 0) return { preview: [], failed: [] }
+
+        const scrapeResult = await scrapeFilms(films)
+        if (!scrapeResult.ok) return { error: scrapeResult.error }
 
         const preview: {
             filmId: number
@@ -43,31 +75,32 @@ export const actions: Actions = {
             removed: number
             changed: number
         }[] = []
-        const unmatched: string[] = []
+        // A film the scraper couldn't read is not a film with no offers.
+        // Diffing it would show every offer being removed, which is a wrong
+        // answer rather than a missing one -- so it's listed separately and
+        // left out of the preview entirely.
+        const failed: string[] = []
 
-        for (const [year, entries] of Object.entries(scrapeResult.data)) {
-            if (!Array.isArray(entries)) continue // e.g. "textContent" passthrough
-            for (const entry of entries) {
-                const film = filmsByKey.get(filmKey(year, entry.title))
-                if (!film) {
-                    unmatched.push(`${entry.title} (${year})`)
-                    continue
-                }
-                const diff = diffServices(film.services, entry.service)
-                preview.push({
-                    filmId: film.id,
-                    year: film.year,
-                    title: film.title,
-                    oldCount: film.services.length,
-                    newCount: entry.service.length,
-                    added: diff.added.length,
-                    removed: diff.removed.length,
-                    changed: diff.changed.length
-                })
+        films.forEach((film, i) => {
+            const entry = scrapeResult.data[i]
+            if (entry.error) {
+                failed.push(`${film.title} (${film.year}): ${entry.error}`)
+                return
             }
-        }
+            const diff = diffServices(film.services, entry.service)
+            preview.push({
+                filmId: film.id,
+                year: film.year,
+                title: film.title,
+                oldCount: film.services.length,
+                newCount: entry.service.length,
+                added: diff.added.length,
+                removed: diff.removed.length,
+                changed: diff.changed.length
+            })
+        })
 
-        return { preview, unmatched }
+        return { preview, failed }
     },
 
     // Re-scrapes just this film fresh (doesn't trust anything from the
@@ -95,41 +128,37 @@ export const actions: Actions = {
         return { appliedOne: filmId }
     },
 
-    // Re-scrapes everything fresh and applies every matched film in one
-    // pass, rather than trusting the (possibly stale) preview payload.
+    // Re-scrapes every film fresh and applies them in one pass, rather than
+    // trusting the (possibly stale) preview payload.
     applyAll: async ({ locals }) => {
         await requireAdmin(locals)
 
-        const scrapeResult = await scrapeAll()
+        const films = await loadFilmsWithServices()
+        if (films.length === 0) return { appliedAll: 0, errors: [], cleared: [] }
+
+        const scrapeResult = await scrapeFilms(films)
         if (!scrapeResult.ok) return { error: scrapeResult.error }
 
-        const films = await loadFilmsWithServices()
-        const filmsByKey = new Map(films.map((f) => [filmKey(f.year, f.title), f]))
-
         const errors: string[] = []
-        const matched: { film: FilmRow; entry: { title: string; service: ScraperOffer[] } }[] = []
+        const scraped: { film: FilmRow; offers: ScraperOffer[] }[] = []
 
-        for (const [year, entries] of Object.entries(scrapeResult.data)) {
-            if (!Array.isArray(entries)) continue
-            for (const entry of entries) {
-                const film = filmsByKey.get(filmKey(year, entry.title))
-                if (!film) continue
-                if (entry.error) {
-                    errors.push(`${entry.title}: ${entry.error}`)
-                    continue
-                }
-                matched.push({ film, entry })
+        films.forEach((film, i) => {
+            const entry: FilmResult = scrapeResult.data[i]
+            if (entry.error) {
+                errors.push(`${film.title}: ${entry.error}`)
+                return
             }
-        }
+            scraped.push({ film, offers: entry.service })
+        })
 
         // A film here and there genuinely streams nowhere. Every film
         // streaming nowhere is a broken scrape, not a catalogue that emptied
         // overnight — and applying it would erase the one thing the site is
         // for. Refuse the whole run rather than write a single row.
-        const withOffers = matched.filter(({ entry }) => entry.service.length > 0)
-        if (matched.length > 0 && withOffers.length === 0) {
+        const withOffers = scraped.filter(({ offers }) => offers.length > 0)
+        if (scraped.length > 0 && withOffers.length === 0) {
             return {
-                error: `Refused: the scrape found no streaming offers for any of the ${matched.length} matched films, which means the scrape failed rather than every film leaving every service. Nothing was changed.`
+                error: `Refused: the scrape found no streaming offers for any of the ${scraped.length} films, which means the scrape failed rather than every film leaving every service. Nothing was changed.`
             }
         }
 
@@ -138,15 +167,15 @@ export const actions: Actions = {
         // worth an admin's eyes rather than passing silently inside a count.
         const cleared: string[] = []
 
-        for (const { film, entry } of matched) {
-            const applyResult = await applyFilmOffers(film.id, entry.service)
+        for (const { film, offers } of scraped) {
+            const applyResult = await applyFilmOffers(film.id, offers)
             if (!applyResult.ok) {
-                errors.push(`${entry.title}: ${applyResult.error}`)
+                errors.push(`${film.title}: ${applyResult.error}`)
                 continue
             }
             appliedCount++
-            if (entry.service.length === 0 && film.services.length > 0) {
-                cleared.push(`${entry.title} — ${film.services.length} offer(s) removed, now streaming nowhere`)
+            if (offers.length === 0 && film.services.length > 0) {
+                cleared.push(`${film.title} — ${film.services.length} offer(s) removed, now streaming nowhere`)
             }
         }
 
