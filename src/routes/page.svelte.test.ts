@@ -183,6 +183,98 @@ describe("progress bar", () => {
   });
 });
 
+describe("hide watched", () => {
+  const loggedIn = {
+    session: { user: { id: "user-1" } },
+    watched: { "2025": ["Film 2025 #1", "Film 2025 #2"] },
+  };
+
+  async function openFilterAndHide() {
+    await fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+    await fireEvent.click(screen.getByLabelText("Hide watched"));
+    await tick();
+  }
+
+  it("offers no Hide watched control to a logged-out reader", async () => {
+    await renderPage();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+
+    expect(screen.queryByLabelText("Hide watched")).not.toBeInTheDocument();
+  });
+
+  it("removes the watched films and keeps the rest", async () => {
+    await renderPage(loggedIn);
+    expect(screen.getByRole("heading", { name: "Film 2025 #1" })).toBeInTheDocument();
+
+    await openFilterAndHide();
+
+    expect(
+      screen.queryByRole("heading", { name: "Film 2025 #1" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Film 2025 #2" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Film 2025 #3" }),
+    ).toBeInTheDocument();
+  });
+
+  // The point of the feature is to clear finished films out of the list
+  // while still being told how far through the year you are. Filtering
+  // `films` itself rather than the rendered list would walk the bar back to
+  // 0 of 31 and then hide it entirely, which reads as losing your progress.
+  it("still reports full progress while the watched films are hidden", async () => {
+    await renderPage(loggedIn);
+    expect(screen.getByText("2 of 31 watched")).toBeInTheDocument();
+
+    await openFilterAndHide();
+
+    expect(screen.getByText("2 of 31 watched")).toBeInTheDocument();
+  });
+
+  it("explains the empty list and offers a way back when every film is watched", async () => {
+    await renderPage({
+      session: { user: { id: "user-1" } },
+      watched: {
+        "2025": filmsByYear["2025"].map((film) => film.title),
+      },
+    });
+
+    await openFilterAndHide();
+
+    expect(screen.getByText(/watched every film in 2025/)).toBeInTheDocument();
+    expect(screen.getByText("31 of 31 watched")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Show them again" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Film 2025 #1" }),
+    ).toBeInTheDocument();
+  });
+
+  // The service and price filters are rebuilt per year because each year's
+  // options differ; "hide what I've watched" is a standing preference and
+  // should survive the switch.
+  it("stays on when the year changes", async () => {
+    await renderPage({
+      session: { user: { id: "user-1" } },
+      watched: { "2025": ["Film 2025 #1"], "2024": ["Film 2024 #1"] },
+    });
+
+    await openFilterAndHide();
+    await fireEvent.click(screen.getByRole("button", { name: "2024" }));
+    await tick();
+
+    expect(
+      screen.queryByRole("heading", { name: "Film 2024 #1" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Film 2024 #2" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("unreleased years", () => {
   // What an admin gets: 2026 exists and is clickable, but the page opens on
   // the newest public year rather than a list of placeholders.

@@ -31,6 +31,16 @@
   $: filterOptions = collectFilterOptions(films);
   let selectedServices: Set<string> | undefined = undefined;
   let selectedPrices: Set<string> | undefined = undefined;
+  let hideWatched = false;
+
+  // Filtered here at the render site rather than by narrowing `films` itself.
+  // `films` feeds watchedCount and the progress bar's total, so hiding the
+  // watched ones must not reach it — otherwise ticking films off would walk
+  // the bar backwards to 0/0 and then hide it entirely. The bar reports
+  // progress against the whole year; this only changes what's listed below.
+  $: visibleFilms = hideWatched
+    ? films.filter((film) => !watchedForYear.includes(film.title))
+    : films;
 
   // Restored after mount, not during init: the server has no localStorage,
   // so reading it earlier would render one year server-side and a different
@@ -115,12 +125,16 @@
   <Filter
     services={filterOptions.services}
     prices={filterOptions.prices}
+    canHideWatched={!!data.session}
+    bind:hideWatched
     bind:selectedServices
     bind:selectedPrices
   />
 {/key}
 
-{#each films as film}
+<!-- Keyed by title: unkeyed, Svelte reuses nodes by index, so hiding one
+     film re-labels every film below it instead of removing that one. -->
+{#each visibleFilms as film (film.title)}
   <Listing
     date={film.date}
     title={film.title}
@@ -131,3 +145,17 @@
     visiblePrices={selectedPrices}
   />
 {/each}
+
+<!-- Only reachable with the filter on, since a year always has films. Without
+     this the page would end on a blank space under the filter, with the way
+     back hidden inside a dropdown. -->
+{#if visibleFilms.length === 0}
+  <p class="mb-5">
+    You've watched every film in {selectedYear}.
+    <button
+      type="button"
+      class="text-green underline"
+      on:click={() => (hideWatched = false)}>Show them again</button
+    >
+  </p>
+{/if}
