@@ -1782,46 +1782,135 @@
         {
             "date": "10/20/2024",
             "id": 202420,
+            "justwatch_url": "https://www.justwatch.com/us/movie/le-cercle",
             "service": [
                 {
                     "currency": "USD",
-                    "icon": "https://images.justwatch.com/icon/347157971/s100/justwatchtv.webp",
-                    "link": "https://www.justwatch.com/us/movie/the-ring?package=jwt",
-                    "name": "JustWatch TV",
-                    "price": null,
-                    "type": "free"
+                    "icon": "https://images.justwatch.com/icon/340823436/s100/amazon.webp",
+                    "link": "https://watch.amazon.com/detail?gti=amzn1.dv.gti.1b84234b-a27c-417c-9257-fe00a40d4719",
+                    "name": "Amazon Video",
+                    "price": 14.99,
+                    "type": "buy"
                 },
                 {
                     "currency": "USD",
-                    "icon": "https://images.justwatch.com/icon/316727345/s100/fubotv.webp",
-                    "link": "https://www.fubo.tv/welcome/program/MV000262100000?irmp=1206980&irad=599309",
-                    "name": "fuboTV",
+                    "icon": "https://images.justwatch.com/icon/338253243/s100/itunes.webp",
+                    "link": "https://tv.apple.com/us/movie/the-ring/umc.cmc.2ksr5tpy9g97n8d3ohyqog9o5?at=1000l3V2&ct=app_tv&itscg=30200&itsct=justwatch_tv&playableId=tvs.sbd.9001%3A295256274",
+                    "name": "Apple TV Store",
+                    "price": 14.99,
+                    "type": "buy"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/346744144/s100/vudu.webp",
+                    "link": "https://athome.fandango.com/content/browse/details/The-Ring/326539",
+                    "name": "Fandango At Home",
+                    "price": 14.99,
+                    "type": "buy"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/340823436/s100/amazon.webp",
+                    "link": "https://watch.amazon.com/detail?gti=amzn1.dv.gti.1b84234b-a27c-417c-9257-fe00a40d4719",
+                    "name": "Amazon Video",
+                    "price": 3.99,
+                    "type": "rent"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/338253243/s100/itunes.webp",
+                    "link": "https://tv.apple.com/us/movie/the-ring/umc.cmc.2ksr5tpy9g97n8d3ohyqog9o5?at=1000l3V2&ct=app_tv&itscg=30200&itsct=justwatch_tv&playableId=tvs.sbd.9001%3A295256274",
+                    "name": "Apple TV Store",
+                    "price": 3.99,
+                    "type": "rent"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/346744144/s100/vudu.webp",
+                    "link": "https://athome.fandango.com/content/browse/details/The-Ring/326539",
+                    "name": "Fandango At Home",
+                    "price": 3.99,
+                    "type": "rent"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/347157971/s100/justwatchtv.webp",
+                    "link": "https://www.justwatch.com/us/movie/le-cercle?package=jwt",
+                    "name": "JustWatch TV",
+                    "price": 3.99,
+                    "type": "rent"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/302467394/s100/epix.webp",
+                    "link": "https://www.mgmplus.com/movie/the-ring-2002",
+                    "name": "MGM Plus",
                     "price": null,
                     "type": "subscription"
                 },
                 {
                     "currency": "USD",
-                    "icon": "https://images.justwatch.com/icon/76972041/s100/rokuchannel.webp",
-                    "link": "https://therokuchannel.roku.com/details/39f357505d9c58a79424b446129b54bf/the-ring?source=bing",
-                    "name": "The Roku Channel",
+                    "icon": "https://images.justwatch.com/icon/302467404/s100/amazonepix.webp",
+                    "link": "https://watch.amazon.com/detail?gti=amzn1.dv.gti.1b84234b-a27c-417c-9257-fe00a40d4719",
+                    "name": "MGM+ Amazon Channel",
                     "price": null,
-                    "type": "free"
+                    "type": "subscription"
                 },
                 {
                     "currency": "USD",
-                    "icon": "https://images.justwatch.com/icon/241588643/s100/kanopy.webp",
-                    "link": "https://www.kanopy.com/product/justwatch-5485060",
-                    "name": "Kanopy",
+                    "icon": "https://images.justwatch.com/icon/339047242/s100/paramountplusessential.webp",
+                    "link": "https://www.paramountplus.com/movies/ring/nQLTWjR4DC_CnxiT6IG2zjhbP98SmhQ0?searchReferral=publisher&source=search-feeds",
+                    "name": "Paramount Plus Essential",
                     "price": null,
-                    "type": "free"
+                    "type": "subscription"
                 },
                 {
                     "currency": "USD",
-                    "icon": "https://images.justwatch.com/icon/313528601/s100/tubitv.webp",
-                    "link": "https://tubitv.com/movies/675116",
-                    "name": "Tubi TV",
+                    "icon": "https://images.justwatch.com/icon/332803145/s100/paramountpluspremium.webp",
+                    "link": "https://www.paramountplus.com/movies/ring/nQLTWjR4DC_CnxiT6IG2zjhbP98SmhQ0?searchReferral=publisher&source=search-feeds",
+                    "name": "Paramount Plus Premium",
                     "price": null,
-                    "type": "free"
+                    "type": "subscription"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/246478651/s100/amazonparamountplus.webp",
+                    "link": "https://watch.amazon.com/detail?gti=amzn1.dv.gti.1b84234b-a27c-417c-9257-fe00a40d4719",
+                    "name": "Paramount+ Amazon Channel",
+                    "price": null,
+                    "type": "subscription"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/252888457/s100/rokuchannelparamountplus.webp",
+                    "link": "https://therokuchannel.roku.com/details/a509c2413ba6592db6c6a77c9158d9fb/the-ring?source=bing",
+                    "name": "Paramount+ Roku Premium Channel",
+                    "price": null,
+                    "type": "subscription"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/327419079/s100/philo.webp",
+                    "link": "https://www.philo.com/player/show/U2hvdzo2MDg1NDg4OTk2NDg0NTE4MDY",
+                    "name": "Philo",
+                    "price": null,
+                    "type": "subscription"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/348553034/s100/philofast.webp",
+                    "link": "https://www.philo.com/player/player/broadcast/QnJvYWRjYXN0OjYwODU0ODg5OTY4Mjg1Nzg5NQ",
+                    "name": "Philo Live",
+                    "price": null,
+                    "type": "subscription"
+                },
+                {
+                    "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/316727345/s100/fubotv.webp",
+                    "link": "https://www.fubo.tv/welcome/program/MV001186220000?irmp=1206980&irad=599309",
+                    "name": "fuboTV",
+                    "price": null,
+                    "type": "subscription"
                 }
             ],
             "title": "The Ring"
