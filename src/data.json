@@ -1898,6 +1898,14 @@
                 },
                 {
                     "currency": "USD",
+                    "icon": "https://images.justwatch.com/icon/348553034/s100/philofast.webp",
+                    "link": "https://www.philo.com/player/player/broadcast/QnJvYWRjYXN0OjYwODU0ODg5OTY4Mjg1Nzg5NQ",
+                    "name": "Philo Live",
+                    "price": null,
+                    "type": "subscription"
+                },
+                {
+                    "currency": "USD",
                     "icon": "https://images.justwatch.com/icon/316727345/s100/fubotv.webp",
                     "link": "https://www.fubo.tv/welcome/program/MV001186220000?irmp=1206980&irad=599309",
                     "name": "fuboTV",
