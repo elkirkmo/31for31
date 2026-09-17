@@ -3,6 +3,7 @@ import type { Actions } from './$types'
 import type { WatchedFilms } from '../database.types'
 import { dev } from '$app/environment'
 import { visibleYearsOnly } from '$lib/yearVisibility'
+import { listFilms } from '$lib/server/scraperClient'
 
 export type FilmEntry = {
     id: number
@@ -23,23 +24,24 @@ export async function load({ locals: { supabase, safeGetSession }, parent }) {
     const { user } = await safeGetSession()
     const { isAdmin } = await parent()
 
-    const { data: filmRows, error: filmsError } = await supabase
-        .from('films')
-        .select('id, year, date, title, justwatch_url, services(*)')
-        .order('year')
-        .order('sort_order')
+    // The catalogue comes from the scraper now, not Supabase. It arrives
+    // already ordered by year then sort_order -- that ordering is the API's
+    // to decide, so nothing here re-sorts it.
+    const filmsResult = await listFilms()
 
     // A failed read must not render as an empty list. The film list is the
-    // whole page, so "no films" and "the query broke" look identical to a
+    // whole page, so "no films" and "the read broke" look identical to a
     // visitor — and identical to us, which is how a production outage went
-    // undiagnosed. Log it so it reaches the platform logs, then fail loudly.
-    if (filmsError) {
-        console.error('films query failed:', filmsError)
+    // undiagnosed. That risk is larger now, not smaller: the scraper is a
+    // hard runtime dependency of this page, so its outage is this page's
+    // outage. Log it so it reaches the platform logs, then fail loudly.
+    if (!filmsResult.ok) {
+        console.error('films request failed:', filmsResult.status, filmsResult.error)
         throw error(500, "Couldn't load the films. Please try again.")
     }
 
     const filmsByYear: Record<string, FilmEntry[]> = {}
-    for (const row of (filmRows ?? []) as unknown as (FilmEntry & { year: number; services: FilmEntry['service'] })[]) {
+    for (const row of filmsResult.data) {
         const year = String(row.year)
         if (!filmsByYear[year]) filmsByYear[year] = []
         filmsByYear[year].push({

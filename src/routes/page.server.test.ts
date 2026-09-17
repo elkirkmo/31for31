@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const listFilms = vi.fn();
+vi.mock("$lib/server/scraperClient", () => ({
+  listFilms: (...args: unknown[]) => listFilms(...args),
+}));
+
 import { actions, load } from "./+page.server";
 import type { WatchedFilms } from "../database.types";
 
@@ -140,20 +146,18 @@ function fakeSupabaseForLoad({
   filmsError?: { message: string } | null;
   progressError?: { message: string } | null;
 } = {}) {
+  // The catalogue comes from the scraper over HTTP now, so `filmRows` and
+  // `filmsError` configure that client rather than a Supabase table. Only
+  // `progress` -- the user's own rows, read as the user under RLS -- is still
+  // answered by this fake.
+  listFilms.mockResolvedValue(
+    filmsError
+      ? { ok: false as const, status: 502, error: filmsError.message }
+      : { ok: true as const, data: filmRows },
+  );
+
   return {
     from: vi.fn((table: string) => {
-      if (table === "films") {
-        return {
-          select: vi.fn(() => ({
-            order: vi.fn(() => ({
-              order: vi.fn(async () => ({
-                data: filmsError ? null : filmRows,
-                error: filmsError,
-              })),
-            })),
-          })),
-        };
-      }
       if (table === "progress") {
         return {
           select: vi.fn(() => ({

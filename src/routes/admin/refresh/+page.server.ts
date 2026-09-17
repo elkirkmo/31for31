@@ -1,32 +1,19 @@
 import { requireAdmin } from '$lib/server/requireAdmin'
-import { supabaseAdmin } from '$lib/server/supabaseAdmin'
-import { scrapeMany, scrapeOne, type FilmResult, type ScraperOffer } from '$lib/server/scraperClient'
-import { applyFilmOffers } from '$lib/server/applyOffers'
+import {
+    listFilms,
+    refreshFilm,
+    refreshAllFilms,
+    scrapeMany,
+    type ScraperFilm
+} from '$lib/server/scraperClient'
 import { diffServices } from '$lib/server/diffOffers'
 import type { Actions } from './$types'
 
-type FilmRow = {
-    id: number
-    year: number
-    title: string
-    justwatch_url: string | null
-    services: ScraperOffer[]
-}
-
-async function loadFilmsWithServices() {
-    const { data } = await supabaseAdmin
-        .from('films')
-        .select('id, year, title, justwatch_url, services(*)')
-        .order('year')
-        .order('sort_order')
-    return (data ?? []) as unknown as FilmRow[]
-}
-
-// Our films table is the list now, so the scraper is told what to scrape
-// rather than consulting its own copy. That removes the year::title join
-// the two sides used to agree on -- results come back in request order, so
-// a film is identified by its row, and renaming one can no longer orphan it.
-async function scrapeFilms(films: FilmRow[]) {
+// The batch dry-run still goes through POST /api/scrape, which answers in
+// request order, so the caller pairs results to films by index. The scraper
+// is meant to grow POST /films/preview and key the diff by film_id itself;
+// until it does, the pairing -- and the guard below -- stay here.
+async function scrapeFilms(films: ScraperFilm[]) {
     const result = await scrapeMany(
         films.map((film) => ({
             title: film.title,
@@ -35,9 +22,10 @@ async function scrapeFilms(films: FilmRow[]) {
     )
     if (!result.ok) return result
 
-    // Pairing by index is only sound while the lengths agree. If they ever
-    // don't, every film after the discrepancy would be written with another
-    // film's offers -- refuse rather than corrupt the catalogue.
+    // Pairing by index is only sound while the lengths agree. This path
+    // writes nothing, so a mismatch shows the wrong diff rather than
+    // corrupting anything -- but a confidently wrong preview is worse than
+    // no preview, so refuse it.
     if (result.data.length !== films.length) {
         return {
             ok: false as const,
@@ -54,12 +42,15 @@ export async function load({ locals }: { locals: App.Locals }) {
 }
 
 export const actions: Actions = {
-    // Scrapes every film in our table and diffs the result against what we
-    // have stored -- never writes anything. Review, then Apply.
+    // Scrapes every film and diffs the result against what's stored --
+    // never writes anything. Review, then Apply.
     preview: async ({ locals }) => {
         await requireAdmin(locals)
 
-        const films = await loadFilmsWithServices()
+        const filmsResult = await listFilms()
+        if (!filmsResult.ok) return { error: filmsResult.error }
+
+        const films = filmsResult.data
         if (films.length === 0) return { preview: [], failed: [] }
 
         const scrapeResult = await scrapeFilms(films)
@@ -103,82 +94,69 @@ export const actions: Actions = {
         return { preview, failed }
     },
 
-    // Re-scrapes just this film fresh (doesn't trust anything from the
-    // preview step) and applies it.
+    // One film, re-scraped and stored server-side.
     applyOne: async ({ request, locals }) => {
         await requireAdmin(locals)
 
         const form = await request.formData()
         const filmId = Number(form.get('filmId'))
 
-        const { data: film } = await supabaseAdmin
-            .from('films')
-            .select('title, justwatch_url')
-            .eq('id', filmId)
-            .single()
-        if (!film) return { error: 'Film not found.' }
-
-        const result = await scrapeOne(film.title, film.justwatch_url ?? undefined)
-        if (!result.ok) return { error: result.error }
-        if (result.data.error) return { error: result.data.error }
-
-        const applyResult = await applyFilmOffers(filmId, result.data.service)
-        if (!applyResult.ok) return { error: applyResult.error }
+        const result = await refreshFilm(filmId)
+        if (!result.ok) {
+            if (result.status === 404) return { error: 'Film not found.' }
+            if (result.status === 502) return { error: `${result.error} The existing offers were left unchanged.` }
+            return { error: result.error }
+        }
+        if (!result.data.refreshed) {
+            return { error: `${result.data.error ?? 'The scrape failed.'} The existing offers were left unchanged.` }
+        }
 
         return { appliedOne: filmId }
     },
 
-    // Re-scrapes every film fresh and applies them in one pass, rather than
-    // trusting the (possibly stale) preview payload.
+    // The whole catalogue in one pass, scraped and stored server-side.
+    //
+    // The "every readable film came back empty = broken scrape, refuse the
+    // run" guard lives in the scraper now and answers 502; this renders that
+    // message rather than reimplementing the rule. Likewise there is no
+    // index pairing to get wrong -- each result carries its own film_id.
     applyAll: async ({ locals }) => {
         await requireAdmin(locals)
 
-        const films = await loadFilmsWithServices()
-        if (films.length === 0) return { appliedAll: 0, errors: [], cleared: [] }
-
-        const scrapeResult = await scrapeFilms(films)
-        if (!scrapeResult.ok) return { error: scrapeResult.error }
-
-        const errors: string[] = []
-        const scraped: { film: FilmRow; offers: ScraperOffer[] }[] = []
-
-        films.forEach((film, i) => {
-            const entry: FilmResult = scrapeResult.data[i]
-            if (entry.error) {
-                errors.push(`${film.title}: ${entry.error}`)
-                return
-            }
-            scraped.push({ film, offers: entry.service })
-        })
-
-        // A film here and there genuinely streams nowhere. Every film
-        // streaming nowhere is a broken scrape, not a catalogue that emptied
-        // overnight — and applying it would erase the one thing the site is
-        // for. Refuse the whole run rather than write a single row.
-        const withOffers = scraped.filter(({ offers }) => offers.length > 0)
-        if (scraped.length > 0 && withOffers.length === 0) {
-            return {
-                error: `Refused: the scrape found no streaming offers for any of the ${scraped.length} films, which means the scrape failed rather than every film leaving every service. Nothing was changed.`
-            }
+        // Read the catalogue first purely to know which films *had* offers.
+        // The refresh response reports how many offers each film ended with
+        // but not what it started with, so "had offers, now has none" can
+        // only be worked out against a before picture. When the response
+        // carries `cleared` itself, this read and the derivation below go.
+        const before = await listFilms()
+        const offerCountBefore = new Map<number, number>()
+        if (before.ok) {
+            for (const film of before.data) offerCountBefore.set(film.id, film.services.length)
+        } else {
+            // Not fatal: losing the before picture costs the `cleared`
+            // report, not the refresh itself.
+            console.error('pre-refresh films read failed:', before.status, before.error)
         }
 
-        let appliedCount = 0
+        const result = await refreshAllFilms()
+        if (!result.ok) return { error: result.error }
+
+        const errors: string[] = []
         // Films that had offers and now have none. Legitimate one at a time,
         // worth an admin's eyes rather than passing silently inside a count.
         const cleared: string[] = []
 
-        for (const { film, offers } of scraped) {
-            const applyResult = await applyFilmOffers(film.id, offers)
-            if (!applyResult.ok) {
-                errors.push(`${film.title}: ${applyResult.error}`)
+        for (const entry of result.data.results) {
+            if (!entry.refreshed) {
+                errors.push(`${entry.title}: ${entry.error ?? 'scrape failed'}`)
                 continue
             }
-            appliedCount++
-            if (offers.length === 0 && film.services.length > 0) {
-                cleared.push(`${film.title} — ${film.services.length} offer(s) removed, now streaming nowhere`)
+            const had = offerCountBefore.get(entry.film_id) ?? 0
+            if (entry.services_updated === 0 && had > 0) {
+                cleared.push(`${entry.title} — ${had} offer(s) removed, now streaming nowhere`)
             }
         }
 
-        return { appliedAll: appliedCount, errors, cleared }
+        return { appliedAll: result.data.refreshed, errors, cleared }
     }
 }
