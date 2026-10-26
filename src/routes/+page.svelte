@@ -33,6 +33,20 @@
   let selectedPrices: Set<string> | undefined = undefined;
   let hideWatched = false;
 
+  // Each year's filter has to start with everything selected, and Filter
+  // can't arrange that itself: with bind:, the copy that {#key selectedYear}
+  // re-creates takes the parent's current value, not its own default. So the
+  // first year's selection would carry into every other year -- and when that
+  // year has no offers (placeholders), it's an empty selection that marks
+  // every film on the site "Streaming unavailable". Clearing to undefined
+  // lets the new Filter fall back to selecting all of this year's options.
+  $: selectedYear, resetFilterSelection();
+
+  function resetFilterSelection() {
+    selectedServices = undefined;
+    selectedPrices = undefined;
+  }
+
   // Filtered here at the render site rather than by narrowing `films` itself.
   // `films` feeds watchedCount and the progress bar's total, so hiding the
   // watched ones must not reach it — otherwise ticking films off would walk
