@@ -1,5 +1,6 @@
+import { error } from '@sveltejs/kit'
 import { requireAdmin } from '$lib/server/requireAdmin'
-import { supabaseAdmin } from '$lib/server/supabaseAdmin'
+import { listFilms } from '$lib/server/scraperClient'
 
 export type FilmListEntry = {
     id: number
@@ -13,14 +14,18 @@ export type FilmListEntry = {
 export async function load({ locals }: { locals: App.Locals }) {
     await requireAdmin(locals)
 
-    const { data: films } = await supabaseAdmin
-        .from('films')
-        .select('id, year, date, title, justwatch_url, services(id)')
-        .order('year')
-        .order('sort_order')
+    const result = await listFilms()
+
+    // The old Supabase read discarded its error and fell through to an empty
+    // list, which on this page reads as "the catalogue is empty" -- the same
+    // confusion the homepage comment warns about. Surface it instead.
+    if (!result.ok) {
+        console.error('admin films request failed:', result.status, result.error)
+        throw error(500, `Couldn't load the films: ${result.error}`)
+    }
 
     const filmsByYear: Record<string, FilmListEntry[]> = {}
-    for (const film of (films ?? []) as unknown as (FilmListEntry & { services: { id: number }[] })[]) {
+    for (const film of result.data) {
         const year = String(film.year)
         if (!filmsByYear[year]) filmsByYear[year] = []
         filmsByYear[year].push({
