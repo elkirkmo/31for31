@@ -317,3 +317,80 @@ describe("unreleased years", () => {
     expect(screen.queryByText(/unreleased/)).not.toBeInTheDocument();
   });
 });
+
+describe("filter across years", () => {
+  const offer = (name: string, type = "subscription") => ({
+    name,
+    type,
+    price: null,
+    currency: null,
+    link: `https://example.com/${name.toLowerCase()}`,
+    icon: null,
+  });
+
+  const filmWith = (year: string, title: string, service: unknown[]) => ({
+    id: Number(year),
+    date: `10/1/${year}`,
+    title,
+    justwatch_url: null,
+    service,
+  });
+
+  // The production outage of October 2026: the year the page opens on had no
+  // offers at all (placeholders), so the filter started out with nothing
+  // selected -- and that empty selection carried into every other year,
+  // marking every film on the site "Streaming unavailable".
+  it("shows another year's offers when the opening year has none", async () => {
+    await renderPage({
+      filmsByYear: {
+        "2026": [filmWith("2026", "Placeholder Film 1", [])],
+        "2024": [filmWith("2024", "Trick R Treat", [offer("Shudder")])],
+      },
+      defaultYear: "2026",
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "2024" }));
+    await tick();
+
+    expect(
+      screen.getByRole("link", { name: /Stream with your Shudder subscription/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Streaming unavailable")).not.toBeInTheDocument();
+  });
+
+  // The quieter form of the same bug: a service only the other year has must
+  // not be filtered out just because the opening year didn't offer it.
+  it("does not hide services the opening year lacked", async () => {
+    await renderPage({
+      filmsByYear: {
+        "2025": [filmWith("2025", "Hatchet", [offer("Netflix")])],
+        "2024": [filmWith("2024", "Trick R Treat", [offer("Shudder"), offer("Vudu", "rent")])],
+      },
+      defaultYear: "2025",
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "2024" }));
+    await tick();
+
+    expect(screen.getByRole("link", { name: /Shudder/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Rent on Vudu/ })).toBeInTheDocument();
+  });
+
+  // Same path as a reader landing straight on a stored year: onMount switches
+  // away from the server-rendered default before anyone clicks anything.
+  it("shows offers on a restored year when the default year has none", async () => {
+    localStorage.setItem("31for31:selectedYear", "2024");
+
+    await renderPage({
+      filmsByYear: {
+        "2026": [filmWith("2026", "Placeholder Film 1", [])],
+        "2024": [filmWith("2024", "Trick R Treat", [offer("Shudder")])],
+      },
+      defaultYear: "2026",
+    });
+    await tick();
+
+    expect(selectedTab()).toBe("2024");
+    expect(screen.getByRole("link", { name: /Shudder/ })).toBeInTheDocument();
+  });
+});
