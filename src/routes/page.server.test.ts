@@ -1,9 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const listFilms = vi.fn();
+const getLiked = vi.fn();
+const setLiked = vi.fn();
 vi.mock("$lib/server/scraperClient", () => ({
   listFilms: (...args: unknown[]) => listFilms(...args),
+  getLiked: (...args: unknown[]) => getLiked(...args),
+  setLiked: (...args: unknown[]) => setLiked(...args),
 }));
+
+const SESSION = { access_token: "user-token" };
+
+beforeEach(() => {
+  getLiked.mockReset().mockResolvedValue({ ok: true, data: {} });
+  setLiked.mockReset().mockResolvedValue({ ok: true, data: { film: {}, liked: {} } });
+});
 
 import { actions, load } from "./+page.server";
 import type { WatchedFilms } from "../database.types";
@@ -43,6 +54,7 @@ function fakeEvent({
   };
 
   const safeGetSession = vi.fn(async () => ({
+    session: loggedIn ? SESSION : null,
     user: loggedIn ? { id: "user-1" } : null,
   }));
 
@@ -278,7 +290,7 @@ describe("root page load", () => {
       ],
       progressError: { message: "connection reset" },
     });
-    const safeGetSession = vi.fn(async () => ({ user: { id: "user-1" } }));
+    const safeGetSession = vi.fn(async () => ({ session: SESSION, user: { id: "user-1" } }));
 
     const result = await load({
       locals: { supabase, safeGetSession },
@@ -296,7 +308,7 @@ describe("root page load", () => {
       filmRows: [],
       watched: { "2025": ["Film A"] },
     });
-    const safeGetSession = vi.fn(async () => ({ user: { id: "user-1" } }));
+    const safeGetSession = vi.fn(async () => ({ session: SESSION, user: { id: "user-1" } }));
 
     const result = await load({
       locals: { supabase, safeGetSession },
@@ -390,5 +402,99 @@ describe("root page load", () => {
 
       expect(Object.keys(result.filmsByYear)).toEqual(["2025", "9999"]);
     });
+  });
+});
+
+describe("likes", () => {
+  const loadAs = (session: unknown, supabase: unknown) =>
+    load({
+      locals: {
+        supabase,
+        safeGetSession: vi.fn(async () => ({
+          session,
+          user: session ? { id: "user-1" } : null,
+        })),
+      },
+      parent: async () => ({ isAdmin: false }),
+    } as unknown as Parameters<typeof load>[0]);
+
+  beforeEach(() => {
+    listFilms.mockResolvedValue({ ok: true, data: [] });
+  });
+
+  it("loads the user's likes from the scraper with their access token", async () => {
+    getLiked.mockResolvedValue({ ok: true, data: { "2024": ["Hatchet"] } });
+
+    const result = await loadAs(SESSION, fakeSupabaseForLoad({ filmRows: [], watched: {} }));
+
+    expect(getLiked).toHaveBeenCalledWith("user-token");
+    expect(result.liked).toEqual({ "2024": ["Hatchet"] });
+  });
+
+  it("doesn't ask the scraper for likes when nobody is logged in", async () => {
+    const result = await loadAs(null, fakeSupabaseForLoad({ filmRows: [], watched: {} }));
+
+    expect(getLiked).not.toHaveBeenCalled();
+    expect(result.liked).toEqual({});
+  });
+
+  // Same rule as the progress row: losing the hearts is worth a log line,
+  // not the whole page.
+  it("renders with no likes rather than failing when the likes read breaks", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    getLiked.mockResolvedValue({ ok: false, status: 502, error: "upstream" });
+
+    const result = await loadAs(SESSION, fakeSupabaseForLoad({ filmRows: [], watched: { "2025": ["Film A"] } }));
+
+    expect(result.liked).toEqual({});
+    expect(result.watched).toEqual({ "2025": ["Film A"] });
+    expect(consoleError).toHaveBeenCalledWith("liked request failed:", 502, "upstream");
+    consoleError.mockRestore();
+  });
+});
+
+describe("setLiked action", () => {
+  it("refuses without a session and never calls the scraper", async () => {
+    const { event } = fakeEvent({ loggedIn: false, formFields: { liked: "true" } });
+
+    expect(await actions.setLiked(event)).toEqual({ error: "Not logged in" });
+    expect(setLiked).not.toHaveBeenCalled();
+  });
+
+  it("likes with liked=true, as the user", async () => {
+    const { event } = fakeEvent({ formFields: { liked: "true" } });
+
+    expect(await actions.setLiked(event)).toEqual({});
+    expect(setLiked).toHaveBeenCalledWith(
+      "user-token",
+      { year: 2025, title: "The Thing From Another World" },
+      true,
+    );
+  });
+
+  it("unlikes with liked=false", async () => {
+    const { event } = fakeEvent({ formFields: { liked: "false" } });
+
+    await actions.setLiked(event);
+
+    expect(setLiked).toHaveBeenCalledWith("user-token", expect.anything(), false);
+  });
+
+  it("tells the reader to log in again when their token has expired", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    setLiked.mockResolvedValue({ ok: false, status: 401, error: "invalid or expired access token" });
+    const { event } = fakeEvent({ formFields: { liked: "true" } });
+
+    expect(await actions.setLiked(event)).toEqual({
+      error: "Your session has expired. Please log in again.",
+    });
+  });
+
+  it("surfaces any other scraper error", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    setLiked.mockResolvedValue({ ok: false, status: 404, error: "no film titled 'X'" });
+    const { event } = fakeEvent({ formFields: { liked: "true" } });
+
+    expect(await actions.setLiked(event)).toEqual({ error: "no film titled 'X'" });
   });
 });

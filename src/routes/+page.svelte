@@ -22,6 +22,7 @@
   $: selectedYear = pickedYear ?? data.defaultYear ?? years[0];
   $: films = data.filmsByYear[selectedYear] ?? [];
   $: watchedForYear = (data.watched?.[selectedYear] ?? []) as string[];
+  $: likedForYear = (data.liked?.[selectedYear] ?? []) as string[];
   // Counted against this year's films rather than off watchedForYear.length:
   // progress can hold titles that have since been renamed or dropped, which
   // would otherwise push the count past the total.
@@ -155,6 +156,7 @@
     service={film.service}
     year={selectedYear}
     watched={data.session ? watchedForYear.includes(film.title) : undefined}
+    liked={data.session ? likedForYear.includes(film.title) : undefined}
     visibleServices={selectedServices}
     visiblePrices={selectedPrices}
   />
