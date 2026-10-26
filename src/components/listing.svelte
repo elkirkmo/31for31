@@ -16,6 +16,9 @@
   }[];
   export let year: string = "";
   export let watched: boolean | undefined = undefined;
+  // Same convention as `watched`: undefined means nobody is logged in, and
+  // the heart isn't shown at all.
+  export let liked: boolean | undefined = undefined;
   export let visibleServices: Set<string> | undefined = undefined;
   export let visiblePrices: Set<string> | undefined = undefined;
 
@@ -40,6 +43,12 @@
     });
 
   $: shownServices = watched === true ? [] : availableServices;
+
+  // Flips the moment the heart is clicked rather than after the scraper
+  // round trip, then hands back to `liked` once the page data reloads -- which
+  // also puts it right if the request failed.
+  let pendingLiked: boolean | undefined = undefined;
+  $: shownLiked = pendingLiked ?? liked;
 
   // `watched === undefined` means nobody is logged in: the checkbox is still
   // shown, but inert, with a hint pointing at the login page.
@@ -134,6 +143,42 @@
         </form>
       {/if}
     </div>
+
+    {#if liked !== undefined}
+      <form
+        method="POST"
+        action="?/setLiked"
+        class="ml-4 shrink-0"
+        use:enhance={() => {
+          pendingLiked = !shownLiked;
+          return async ({ update }) => {
+            await update();
+            pendingLiked = undefined;
+          };
+        }}
+      >
+        <input type="hidden" name="title" value={title} />
+        <input type="hidden" name="year" value={year} />
+        <input type="hidden" name="liked" value={String(!shownLiked)} />
+        <button
+          type="submit"
+          class="like-button"
+          class:text-green={shownLiked}
+          aria-pressed={shownLiked}
+          aria-label={shownLiked ? `Unlike ${title}` : `Like ${title}`}
+        >
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+            <path
+              d="M12 21s-7.5-4.6-9.6-9.3C1 8.4 3.1 4.5 6.9 4.5c2.2 0 3.7 1.2 5.1 3 1.4-1.8 2.9-3 5.1-3 3.8 0 5.9 3.9 4.5 7.2C19.5 16.4 12 21 12 21z"
+              fill={shownLiked ? "currentColor" : "none"}
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+      </form>
+    {/if}
   </div>
 
   {#each shownServices as s, i}
@@ -158,6 +203,23 @@
 </div>
 
 <style>
+  .like-button {
+    display: inline-flex;
+    padding: 0.4em;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+
+  .like-button:hover {
+    transform: scale(1.12);
+  }
+
+  .like-button:focus-visible {
+    outline: 2px solid #66cc33;
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+
   /* Checkbox adapted from https://uiverse.io/Praashoo7/white-seahorse-98 */
   .watch-checkbox {
     display: inline-flex;

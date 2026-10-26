@@ -492,3 +492,53 @@ describe("hiding services once watched", () => {
     expect(screen.getByRole("link", { name: /Tubi/ })).toBeInTheDocument();
   });
 });
+
+describe("like heart", () => {
+  const heart = () => screen.queryByRole("button", { name: /like/i });
+
+  it("isn't shown when nobody is logged in", () => {
+    render(Listing, { ...baseProps, service: [], liked: undefined });
+
+    expect(heart()).not.toBeInTheDocument();
+  });
+
+  it("offers to like a film that isn't liked", () => {
+    const { container } = render(Listing, { ...baseProps, service: [], year: "2025", liked: false });
+
+    expect(heart()).toHaveAccessibleName("Like The Thing From Another World");
+    expect(heart()).toHaveAttribute("aria-pressed", "false");
+    const form = container.querySelector('form[action="?/setLiked"]')!;
+    expect(form.querySelector<HTMLInputElement>('input[name="liked"]')!.value).toBe("true");
+    expect(form.querySelector<HTMLInputElement>('input[name="year"]')!.value).toBe("2025");
+    expect(form.querySelector<HTMLInputElement>('input[name="title"]')!.value).toBe(
+      "The Thing From Another World",
+    );
+  });
+
+  // The form sends the state wanted, not "toggle" -- so a liked film's form
+  // must ask for unliked.
+  it("offers to unlike a liked film", () => {
+    const { container } = render(Listing, { ...baseProps, service: [], liked: true });
+
+    expect(heart()).toHaveAccessibleName("Unlike The Thing From Another World");
+    expect(heart()).toHaveAttribute("aria-pressed", "true");
+    expect(container.querySelector<HTMLInputElement>('input[name="liked"]')!.value).toBe("false");
+  });
+
+  it("fills in as soon as it's clicked, before the server answers", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    HTMLFormElement.prototype.requestSubmit = originalRequestSubmit;
+    render(Listing, { ...baseProps, service: [], liked: false });
+
+    await fireEvent.click(heart()!);
+
+    await waitFor(() => expect(heart()).toHaveAttribute("aria-pressed", "true"));
+    vi.unstubAllGlobals();
+  });
+
+  it("is independent of watched", () => {
+    render(Listing, { ...baseProps, service: [], watched: true, liked: true });
+
+    expect(heart()).toHaveAttribute("aria-pressed", "true");
+  });
+});

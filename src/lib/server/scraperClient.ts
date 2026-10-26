@@ -203,3 +203,47 @@ export async function scrapeOne(title: string, url?: string): Promise<ScraperRes
         error: (body as { error?: string }).error ?? `Scraper request failed with status ${res.status}`
     }
 }
+
+// --- the signed-in user's own data ----------------------------------------
+//
+// These authenticate as the *user*, with their Supabase access token, not
+// with SCRAPER_API_KEY: the scraper forwards the token to Supabase and RLS
+// confines the request to that user's row. So no X-API-Key here -- the token
+// is the whole credential, exactly as it is for someone using curl.
+
+export type LikedFilms = Record<string, string[]>
+
+export type LikeResult = {
+    film: { year: number; title: string }
+    liked: LikedFilms
+}
+
+function userHeaders(accessToken: string) {
+    return {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+    }
+}
+
+// GET /me/liked
+export async function getLiked(accessToken: string): Promise<ScraperResult<LikedFilms>> {
+    const res = await fetch(`${SCRAPER_BASE_URL}/me/liked`, { headers: userHeaders(accessToken) })
+    const result = await parseResult<{ liked: LikedFilms }>(res)
+    return result.ok ? { ok: true, data: result.data.liked } : result
+}
+
+// PUT (like) or DELETE (unlike) /me/liked. Idempotent on the scraper's side,
+// so callers send the state they want rather than a toggle -- a double
+// click or a retry can't flip it back.
+export async function setLiked(
+    accessToken: string,
+    film: { year: number; title: string },
+    liked: boolean
+): Promise<ScraperResult<LikeResult>> {
+    const res = await fetch(`${SCRAPER_BASE_URL}/me/liked`, {
+        method: liked ? 'PUT' : 'DELETE',
+        headers: userHeaders(accessToken),
+        body: JSON.stringify(film)
+    })
+    return parseResult<LikeResult>(res)
+}

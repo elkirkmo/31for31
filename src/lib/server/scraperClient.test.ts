@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('$env/dynamic/private', () => ({ env: { SCRAPER_API_KEY: 'the-admin-key' } }))
 import {
     createFilm,
     deleteFilm,
     getFilm,
+    getLiked,
     listFilms,
     refreshAllFilms,
     refreshFilm,
     scrapeMany,
     scrapeOne,
+    setLiked,
     updateFilm
 } from './scraperClient'
 
@@ -265,5 +269,60 @@ describe('scraperClient catalogue endpoints', () => {
         vi.stubGlobal('fetch', vi.fn(async () => fakeResponse(200, batch)))
 
         expect(await refreshAllFilms()).toEqual({ ok: true, data: batch })
+    })
+})
+
+describe('scraperClient: the user\'s likes', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals()
+    })
+
+    it('getLiked sends the user token and unwraps the likes', async () => {
+        const fetchMock = vi.fn(async () => fakeResponse(200, { liked: { '2024': ['Hatchet'] } }))
+        vi.stubGlobal('fetch', fetchMock)
+
+        const result = await getLiked('user-token')
+
+        expect(result).toEqual({ ok: true, data: { '2024': ['Hatchet'] } })
+        const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+        expect(url).toBe('https://31for31scraper.vercel.app/me/liked')
+        expect((init.headers as Record<string, string>).Authorization).toBe('Bearer user-token')
+    })
+
+    // The admin key can rewrite the catalogue; a user's request has no
+    // business carrying it to an endpoint that doesn't need it.
+    it('never sends the API key with a user request', async () => {
+        const fetchMock = vi.fn(async () => fakeResponse(200, { liked: {} }))
+        vi.stubGlobal('fetch', fetchMock)
+
+        await getLiked('user-token')
+        await setLiked('user-token', { year: 2024, title: 'Hatchet' }, true)
+
+        for (const call of fetchMock.mock.calls as unknown as [string, RequestInit][]) {
+            expect(call[1].headers).not.toHaveProperty('X-API-Key')
+            expect(JSON.stringify(call[1].headers)).not.toContain('the-admin-key')
+        }
+    })
+
+    it('setLiked PUTs to like and DELETEs to unlike, with the film in the body', async () => {
+        const fetchMock = vi.fn(async () =>
+            fakeResponse(200, { film: { year: 2024, title: 'Hatchet' }, liked: {} })
+        )
+        vi.stubGlobal('fetch', fetchMock)
+
+        await setLiked('t', { year: 2024, title: 'Hatchet' }, true)
+        await setLiked('t', { year: 2024, title: 'Hatchet' }, false)
+
+        const calls = fetchMock.mock.calls as unknown as [string, RequestInit][]
+        expect(calls.map((c) => c[1].method)).toEqual(['PUT', 'DELETE'])
+        expect(JSON.parse(calls[0][1].body as string)).toEqual({ year: 2024, title: 'Hatchet' })
+    })
+
+    it('passes an expired-token 401 through as a failed result', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => fakeResponse(401, { error: 'invalid or expired access token' })))
+
+        const result = await setLiked('stale', { year: 2024, title: 'Hatchet' }, true)
+
+        expect(result).toEqual({ ok: false, status: 401, error: 'invalid or expired access token' })
     })
 })
